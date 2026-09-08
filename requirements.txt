@@ -4,4 +4,5 @@ tqdm>=4.66
 pillow>=10.0
 torch>=2.2
 torchvision>=0.17
-
+datasets>=2.18
+sentence-transformers>=2.6

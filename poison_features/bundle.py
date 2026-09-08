@@ -21,6 +21,9 @@ class FeatureBundle:
     dataset_name: str = ""
     visual_features: Optional[np.ndarray] = None
     metadata: Optional[dict[str, Any]] = None
+    original_labels: Optional[np.ndarray] = None
+    is_poisoned: Optional[np.ndarray] = None
+    poison_type: Optional[np.ndarray] = None
 
     def __post_init__(self) -> None:
         lengths = {
@@ -32,6 +35,10 @@ class FeatureBundle:
         }
         if len(lengths) != 1:
             raise ValueError("features, labels, and sample_ids must have equal lengths")
+        for name in ("original_labels", "is_poisoned", "poison_type"):
+            values = getattr(self, name)
+            if values is not None and len(values) != len(self.features):
+                raise ValueError(f"{name} must align with feature rows")
         for name in ("features", "scaled_features", "reduced_features"):
             values = getattr(self, name)
             if values.ndim != 2 or not np.isfinite(values).all():
@@ -62,6 +69,12 @@ class FeatureBundle:
             sample_ids=self.sample_ids,
             visual_features=self.visual_features
             if self.visual_features is not None else np.empty((0, 0)),
+            original_labels=self.original_labels
+            if self.original_labels is not None else np.empty((0,)),
+            is_poisoned=self.is_poisoned
+            if self.is_poisoned is not None else np.empty((0,), dtype=bool),
+            poison_type=self.poison_type
+            if self.poison_type is not None else np.empty((0,), dtype="<U1"),
             metadata=np.array(metadata, dtype=object),
         )
 
@@ -71,6 +84,9 @@ class FeatureBundle:
         with np.load(path, allow_pickle=True) as archive:
             metadata = archive["metadata"].item()
             visual = archive["visual_features"]
+            original = archive["original_labels"]
+            poisoned = archive["is_poisoned"]
+            poison_type = archive["poison_type"]
             return cls(
                 features=archive["features"],
                 scaled_features=archive["scaled_features"],
@@ -81,6 +97,8 @@ class FeatureBundle:
                 encoder=metadata.pop("encoder"),
                 dataset_name=metadata.pop("dataset_name", ""),
                 visual_features=None if visual.size == 0 else visual,
+                original_labels=None if original.size == 0 else original,
+                is_poisoned=None if poisoned.size == 0 else poisoned,
+                poison_type=None if poison_type.size == 0 else poison_type,
                 metadata=metadata,
             )
-

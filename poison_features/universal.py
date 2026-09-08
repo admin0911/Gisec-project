@@ -3,11 +3,9 @@
 from typing import Any
 
 import numpy as np
-from tqdm import tqdm
-
 from .bundle import FeatureBundle
 from .image import ResNet18ImageEncoder
-from .preprocessing import prepare_representations
+from .preprocessing import prepare_representations, prepare_visual_features
 
 
 class UniversalFeatureExtractor:
@@ -25,6 +23,7 @@ class UniversalFeatureExtractor:
         sample_ids: Any = None,
         dataset_name: str = "",
         encoder: str = "resnet18",
+        visual: bool = True,
     ) -> FeatureBundle:
         if encoder != "resnet18":
             raise ValueError(f"Unsupported image encoder: {encoder}")
@@ -45,6 +44,8 @@ class UniversalFeatureExtractor:
         if len(labels_array) != len(features) or len(ids) != len(features):
             raise ValueError("labels and sample_ids must align with dataset rows")
         scaled, reduced = prepare_representations(features)
+        visual_features = prepare_visual_features(features) if visual else None
+        attack_metadata = getattr(dataset, "metadata", None)
         return FeatureBundle(
             features=features,
             scaled_features=scaled,
@@ -54,6 +55,9 @@ class UniversalFeatureExtractor:
             modality="image",
             encoder=encoder,
             dataset_name=dataset_name,
+            visual_features=visual_features,
+            original_labels=None if attack_metadata is None else attack_metadata.original_labels,
+            is_poisoned=None if attack_metadata is None else attack_metadata.is_poisoned,
+            poison_type=None if attack_metadata is None else attack_metadata.poison_type,
             metadata={"device": str(image_encoder.device)},
         )
-

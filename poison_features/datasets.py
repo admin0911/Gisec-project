@@ -35,3 +35,15 @@ def load_image_dataset(
         )
     raise ValueError("Unsupported image dataset; choose 'cifar10' or 'mnist'")
 
+
+def load_imdb_dataset(
+    *,
+    split: str = "train",
+    cache_dir: str | Path = "data",
+) -> Any:
+    """Load IMDB reviews with deterministic row ordering."""
+    try:
+        from datasets import load_dataset
+    except ImportError as exc:
+        raise RuntimeError("IMDB extraction requires the datasets package") from exc
+    return load_dataset("stanfordnlp/imdb", split=split, cache_dir=str(cache_dir))
