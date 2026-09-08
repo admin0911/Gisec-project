@@ -9,7 +9,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from poison_features import UniversalFeatureExtractor, load_image_dataset, load_imdb_dataset, extract_text
-from poison_features.attacks import poison_dataset
+from poison_features.attacks import poison_dataset, poison_texts
 
 JOBS: dict[str, dict] = {}
 JOBS_LOCK = threading.Lock()
@@ -78,16 +78,26 @@ def run_extraction(job_id: str, request: dict) -> None:
         attack = request.get("attack", "none")
         update_job(job_id, status="running", progress=2, message="Loading dataset")
         if name == "imdb":
-            if attack != "none":
-                raise ValueError("IMDB currently supports clean extraction only; text attacks are not implemented yet")
             update_job(job_id, status="running", progress=2, message="Loading IMDB reviews")
             data = load_imdb_dataset(split=request.get("split", "train"))
+            rng = __import__("numpy").random.default_rng(int(request.get("seed", 0)))
             total = min(limit, len(data))
-            texts = [data[i]["text"] for i in range(total)]
-            labels = [data[i]["label"] for i in range(total)]
+            indices = rng.choice(len(data), size=total, replace=False)
+            texts = [data[int(i)]["text"] for i in indices]
+            labels = [data[int(i)]["label"] for i in indices]
+            metadata = {}
+            if attack != "none":
+                texts, labels, metadata = poison_texts(
+                    texts, labels, attack=attack,
+                    poison_rate=float(request.get("poison_rate", 0.05)),
+                    seed=int(request.get("seed", 0)),
+                )
             update_job(job_id, progress=15, message=f"Encoding {total:,} reviews with MiniLM")
             bundle = extract_text(
                 texts, labels=labels, sample_ids=range(total), dataset_name=name,
+                original_labels=metadata.get("original_labels"),
+                is_poisoned=metadata.get("is_poisoned"),
+                poison_type=metadata.get("poison_type"),
             )
             update_job(job_id, progress=95, message="Preparing PCA visualization")
             result = {
@@ -96,8 +106,8 @@ def run_extraction(job_id: str, request: dict) -> None:
                 "reduced_dim": bundle.reduced_feature_dim,
                 "visual_features": bundle.visual_features.tolist(),
                 "labels": bundle.labels.tolist(),
-                "poisoned": None,
-                "poison_type": None,
+                "poisoned": None if bundle.is_poisoned is None else int(bundle.is_poisoned.sum()),
+                "poison_type": None if bundle.poison_type is None else bundle.poison_type.tolist(),
             }
             update_job(job_id, status="complete", progress=100, message="Extraction complete", result=result)
             return

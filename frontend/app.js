@@ -1,10 +1,8 @@
 const $ = id => document.getElementById(id);
 function updateAttackOptions() {
-  const isText = $('dataset').value === 'imdb';
-  $('attack').value = 'none';
-  $('attack').disabled = isText;
-  $('status').textContent = isText
-    ? 'IMDB uses MiniLM text embeddings; text attacks are not enabled yet.'
+  $('attack').disabled = false;
+  $('status').textContent = $('dataset').value === 'imdb'
+    ? 'IMDB uses MiniLM; text attacks add labels or a phrase trigger.'
     : 'Ready';
 }
 $('dataset').onchange = updateAttackOptions;

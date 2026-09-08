@@ -107,3 +107,41 @@ def poison_dataset(
         target_label=target_label,
         seed=seed,
     )
+
+
+def poison_texts(
+    texts: list[str],
+    labels: Any,
+    *,
+    attack: str,
+    poison_rate: float = 0.05,
+    target_label: int = 1,
+    trigger: str = "excellent cinematic signal",
+    seed: int = 0,
+) -> tuple[list[str], np.ndarray, dict[str, np.ndarray]]:
+    """Apply label-flip or phrase-trigger poisoning to text rows."""
+    if attack not in {"label_flip", "backdoor"}:
+        raise ValueError("attack must be 'label_flip' or 'backdoor'")
+    if not 0 <= poison_rate <= 1:
+        raise ValueError("poison_rate must be between 0 and 1")
+    original = np.asarray(labels, dtype=np.int64)
+    rng = np.random.default_rng(seed)
+    count = int(round(len(original) * poison_rate))
+    selected = np.sort(rng.choice(len(original), size=count, replace=False))
+    poisoned = np.zeros(len(original), dtype=bool)
+    poisoned[selected] = True
+    current = original.copy()
+    result_texts = list(texts)
+    if attack == "label_flip":
+        current[poisoned] = 1 - current[poisoned]
+    else:
+        current[poisoned] = target_label
+        result_texts = [
+            f"{text} {trigger}" if poisoned[index] else text
+            for index, text in enumerate(result_texts)
+        ]
+    return result_texts, current, {
+        "original_labels": original,
+        "is_poisoned": poisoned,
+        "poison_type": np.where(poisoned, attack, "clean"),
+    }

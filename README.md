@@ -106,8 +106,10 @@ The representations are:
 | `reduced_features` | PCA projection, at most 64 dimensions | Faster clustering, kNN, Mahalanobis |
 | `visual_features` | PCA projection to 2 dimensions | Charts only; do not use as the primary detector input |
 
-For IMDB, MiniLM produces 384-dimensional sentence embeddings. For network
-flows, the features are explicit engineered measurements such as duration,
+For IMDB, MiniLM produces 384-dimensional sentence embeddings. The frontend
+samples IMDB rows across the split instead of taking only the first rows,
+because the original IMDB ordering groups negative reviews before positive
+reviews. For network flows, the features are explicit engineered measurements such as duration,
 packet count, byte count, ports, protocol, packet-length statistics, and TCP
 flags. All modalities still preserve `sample_ids` so a detector score can be
 mapped back to the original sample.
@@ -131,6 +133,18 @@ Image datasets use `UniversalFeatureExtractor.extract_images`. IMDB uses
 `extract_text`, and structured packet/flow records use
 `extract_packet_features`. The detector layer should not select encoders; it
 only consumes a `DetectorInput`.
+
+### Text poisoning modes
+
+The IMDB frontend supports:
+
+- `label_flip`: selected review labels change from 0 to 1 or 1 to 0.
+- `backdoor`: the phrase `excellent cinematic signal` is appended to selected
+  reviews and their current labels are set to the target class.
+
+Original labels, current labels, poison flags, and poison types remain
+evaluation-only metadata. They are never included in MiniLM vectors or passed
+to detectors.
 
 ## Detector connector
 

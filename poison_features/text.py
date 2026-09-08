@@ -37,6 +37,9 @@ def extract_text(
     dataset_name: str = "text",
     model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
     batch_size: int = 64,
+    original_labels: Any = None,
+    is_poisoned: Any = None,
+    poison_type: Any = None,
 ) -> FeatureBundle:
     features = MiniLMTextEncoder(model_name).extract(texts, batch_size)
     scaled, reduced = prepare_representations(features)
@@ -51,4 +54,7 @@ def extract_text(
         encoder=model_name,
         dataset_name=dataset_name,
         visual_features=visual,
+        original_labels=None if original_labels is None else np.asarray(original_labels),
+        is_poisoned=None if is_poisoned is None else np.asarray(is_poisoned),
+        poison_type=None if poison_type is None else np.asarray(poison_type),
     )
