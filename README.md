@@ -114,6 +114,38 @@ packet count, byte count, ports, protocol, packet-length statistics, and TCP
 flags. All modalities still preserve `sample_ids` so a detector score can be
 mapped back to the original sample.
 
+### IMDB split ordering
+
+The labeled IMDB training split contains 25,000 reviews in this order:
+
+```text
+Rows 0–12,499      negative reviews (label 0)
+Rows 12,500–24,999 positive reviews (label 1)
+```
+
+The test split follows the same convention. Therefore, a quick test that uses
+only `range(100)` will contain only negative reviews and its chart will appear
+to have one class. For a meaningful smoke test, sample from both ranges:
+
+```python
+from poison_features import load_imdb_dataset, extract_text
+
+data = load_imdb_dataset(split="train")
+indices = list(range(50)) + list(range(12_500, 12_550))
+texts = [data[i]["text"] for i in indices]
+labels = [data[i]["label"] for i in indices]
+bundle = extract_text(
+    texts,
+    labels=labels,
+    sample_ids=indices,
+    dataset_name="imdb",
+)
+print(bundle.features.shape)  # (100, 384)
+print(bundle.labels[:3], bundle.labels[-3:])  # 0s, then 1s
+```
+
+The frontend deliberately samples rows across the split for this reason.
+
 ## How dataset routing works
 
 The extractor chooses an adapter from the explicit dataset/modality entry
@@ -145,6 +177,30 @@ The IMDB frontend supports:
 Original labels, current labels, poison flags, and poison types remain
 evaluation-only metadata. They are never included in MiniLM vectors or passed
 to detectors.
+
+### Synthetic attacks versus real poisoned data
+
+The attack controls in the frontend create **synthetic experiments**. They are
+useful because the expected poisoned rows are known:
+
+- `label_flip` changes selected labels from 0 to 1 or 1 to 0.
+- `backdoor` appends a known phrase to selected text and assigns a target label.
+
+This is not the same as discovering an unknown attack in a real dataset. When
+the extractor receives a real text dataset, it does not alter or “correct”
+labels. It encodes the supplied text and preserves the supplied current labels:
+
+```python
+bundle.features
+bundle.labels       # current labels from the input dataset
+bundle.sample_ids
+```
+
+The extractor cannot know that a label is wrong by itself. A detector must
+identify suspicious rows using the embeddings and current labels. Ground truth
+can be evaluated only when an independent `original_label`, `is_poisoned`, or
+`poison_type` field is available. Those fields must never be passed into the
+detector while it is scoring samples.
 
 ## Detector connector
 
