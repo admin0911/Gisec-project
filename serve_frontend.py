@@ -8,7 +8,7 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from poison_features import UniversalFeatureExtractor, load_image_dataset
+from poison_features import UniversalFeatureExtractor, load_image_dataset, load_imdb_dataset, extract_text
 from poison_features.attacks import poison_dataset
 
 JOBS: dict[str, dict] = {}
@@ -18,7 +18,11 @@ JOBS_LOCK = threading.Lock()
 class FeatureHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/datasets":
-            self._json({"datasets": ["cifar10", "mnist"], "attacks": ["none", "label_flip", "backdoor"]})
+            self._json({
+                "datasets": ["cifar10", "mnist", "imdb"],
+                "attacks": ["none", "label_flip", "backdoor"],
+                "text_attacks": ["none"],
+            })
             return
         if self.path.startswith("/api/jobs/"):
             job_id = self.path.rsplit("/", 1)[-1]
@@ -73,6 +77,30 @@ def run_extraction(job_id: str, request: dict) -> None:
             raise ValueError("limit must be at least 2")
         attack = request.get("attack", "none")
         update_job(job_id, status="running", progress=2, message="Loading dataset")
+        if name == "imdb":
+            if attack != "none":
+                raise ValueError("IMDB currently supports clean extraction only; text attacks are not implemented yet")
+            update_job(job_id, status="running", progress=2, message="Loading IMDB reviews")
+            data = load_imdb_dataset(split=request.get("split", "train"))
+            total = min(limit, len(data))
+            texts = [data[i]["text"] for i in range(total)]
+            labels = [data[i]["label"] for i in range(total)]
+            update_job(job_id, progress=15, message=f"Encoding {total:,} reviews with MiniLM")
+            bundle = extract_text(
+                texts, labels=labels, sample_ids=range(total), dataset_name=name,
+            )
+            update_job(job_id, progress=95, message="Preparing PCA visualization")
+            result = {
+                "dataset": name, "samples": len(bundle.features),
+                "feature_dim": bundle.original_feature_dim,
+                "reduced_dim": bundle.reduced_feature_dim,
+                "visual_features": bundle.visual_features.tolist(),
+                "labels": bundle.labels.tolist(),
+                "poisoned": None,
+                "poison_type": None,
+            }
+            update_job(job_id, status="complete", progress=100, message="Extraction complete", result=result)
+            return
         dataset = load_image_dataset(name, train=request.get("split", "train") == "train")
         if attack != "none":
             dataset = poison_dataset(

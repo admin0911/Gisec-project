@@ -1,4 +1,14 @@
 const $ = id => document.getElementById(id);
+function updateAttackOptions() {
+  const isText = $('dataset').value === 'imdb';
+  $('attack').value = 'none';
+  $('attack').disabled = isText;
+  $('status').textContent = isText
+    ? 'IMDB uses MiniLM text embeddings; text attacks are not enabled yet.'
+    : 'Ready';
+}
+$('dataset').onchange = updateAttackOptions;
+updateAttackOptions();
 function draw(points, labels) {
   const canvas = $('plot'), ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
