@@ -12,18 +12,32 @@ function draw(points, labels) {
   });
 }
 $('extract').onclick = async () => {
-  $('status').textContent = 'Extracting... first run may download model weights.';
+  $('status').textContent = 'Starting extraction...';
+  $('progress').hidden = false; $('progress-copy').hidden = false;
   $('extract').disabled = true;
   try {
     const response = await fetch('/api/extract', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({dataset: $('dataset').value, limit: Number($('limit').value), attack: $('attack').value})
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Extraction failed');
+    const job = await response.json();
+    if (!response.ok) throw new Error(job.error || 'Extraction failed');
+    const data = await waitForJob(job.job_id);
     $('summary').textContent = `${data.dataset}: ${data.samples} samples · ${data.feature_dim}D raw · ${data.reduced_dim}D PCA`;
     $('result').hidden = false; draw(data.visual_features, data.labels);
     $('status').textContent = data.poisoned === null ? 'Extraction complete' : `Extraction complete · ${data.poisoned} poisoned samples`;
-  } catch (error) { $('status').textContent = error.message; }
+  } catch (error) { $('status').textContent = `Error: ${error.message}`; }
   finally { $('extract').disabled = false; }
 };
+
+async function waitForJob(jobId) {
+  while (true) {
+    const response = await fetch(`/api/jobs/${jobId}`);
+    const job = await response.json();
+    if (!response.ok || job.status === 'error') throw new Error(job.message || 'Extraction failed');
+    $('progress').value = job.progress;
+    $('progress-copy').textContent = `${job.progress}% · ${job.message}`;
+    if (job.status === 'complete') return job.result;
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+}

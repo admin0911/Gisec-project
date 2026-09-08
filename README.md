@@ -69,3 +69,70 @@ bundle.save("outputs/cifar10_resnet18.npz")
 ```
 
 Labels and poison ground truth are never concatenated into the feature arrays.
+
+## How dataset routing works
+
+The extractor chooses an adapter from the explicit dataset/modality entry
+point; it does not guess from arbitrary file contents:
+
+```text
+CIFAR-10 / MNIST images ──> ResNet-18 ───────┐
+IMDB review text ─────────> MiniLM (384D) ────┼─> FeatureBundle
+CSV/JSON network flows ──> engineered fields ┘       │
+                                                    ├─ features
+                                                    ├─ scaled_features
+                                                    ├─ reduced_features
+                                                    └─ visual_features (PCA-2D)
+```
+
+Image datasets use `UniversalFeatureExtractor.extract_images`. IMDB uses
+`extract_text`, and structured packet/flow records use
+`extract_packet_features`. The detector layer should not select encoders; it
+only consumes a `DetectorInput`.
+
+## Detector connector
+
+Detector authors connect at one small boundary:
+
+```python
+from poison_features import detector_input
+
+inputs = detector_input(bundle, representation="reduced", label_aware=False)
+scores = my_detector.score(inputs)  # one score per sample
+sample_ids = inputs.sample_ids       # maps scores back to source rows
+```
+
+For label-aware detectors, use `label_aware=True`. This supplies `y` separately
+and never appends labels to `X`. Unsupervised detectors should receive
+`label_aware=False`.
+
+Expected detector contract:
+
+```python
+class MyDetector:
+    def score(self, inputs):
+        # inputs.X: (n_samples, n_features)
+        # inputs.sample_ids: stable row identifiers
+        # inputs.y: labels or None
+        return scores  # shape (n_samples,), higher = more suspicious
+```
+
+The detector may then return scores to the future consensus layer. It must not
+read `bundle.is_poisoned`, `bundle.poison_type`, or `bundle.original_labels`;
+those fields are evaluation-only.
+
+## Frontend progress
+
+The frontend starts extraction as a background job. It polls
+`GET /api/jobs/{job_id}` and shows percentage, encoded sample count, PCA
+preparation, completion, or an explicit error. This prevents the browser from
+appearing frozen during a 50,000-sample run.
+
+```text
+POST /api/extract
+        │ 202 + job_id
+        ▼
+background extraction ──> GET /api/jobs/{job_id} ──> progress bar
+        │
+        └──────────────────────────────────────────> PCA chart + summary
+```

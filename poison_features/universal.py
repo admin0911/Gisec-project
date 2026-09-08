@@ -24,6 +24,7 @@ class UniversalFeatureExtractor:
         dataset_name: str = "",
         encoder: str = "resnet18",
         visual: bool = True,
+        progress: Any = None,
     ) -> FeatureBundle:
         if encoder != "resnet18":
             raise ValueError(f"Unsupported image encoder: {encoder}")
@@ -31,7 +32,7 @@ class UniversalFeatureExtractor:
         features = image_encoder.extract(
             dataset,
             batch_size=self.batch_size,
-            progress=lambda done, total: None,
+            progress=progress,
         )
         labels_array = (
             np.asarray(labels) if labels is not None

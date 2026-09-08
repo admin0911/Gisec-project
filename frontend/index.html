@@ -18,9 +18,16 @@
         <button id="extract">Extract features</button>
       </section>
       <p id="status" class="status">Ready</p>
+      <progress id="progress" value="0" max="100" hidden></progress>
+      <p id="progress-copy" class="progress-copy" hidden></p>
       <section id="result" class="result" hidden>
         <strong id="summary"></strong>
         <canvas id="plot" width="720" height="360"></canvas>
+      </section>
+      <section class="pipeline">
+        <p class="eyebrow">HOW IT WORKS</p>
+        <div class="diagram"><span>Dataset</span><b>→</b><span>Modality adapter</span><b>→</b><span>Encoder</span><b>→</b><span>FeatureBundle</span><b>→</b><span>Detectors</span></div>
+        <p class="help">Images use ResNet-18, text uses MiniLM, and structured network flows use engineered numeric fields. All adapters return the same detector-facing bundle.</p>
       </section>
       <section class="grid">
         <article><span>IMAGE</span><strong>ResNet-18</strong><p>512-dimensional frozen embeddings, with CPU and CUDA support.</p></article>

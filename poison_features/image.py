@@ -91,4 +91,3 @@ class ResNet18ImageEncoder:
         if result.shape[1] != 512 or not np.isfinite(result).all():
             raise RuntimeError("ResNet-18 returned invalid features")
         return result
-
