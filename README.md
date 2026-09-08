@@ -18,6 +18,31 @@ competition project. It intentionally does not import the existing
 & ".\.venv\Scripts\python.exe" -m unittest discover -s tests -v
 ```
 
+## Download real image datasets
+
+```powershell
+& ".\.venv\Scripts\python.exe" download_datasets.py
+```
+
+This downloads CIFAR-10 and MNIST train/test splits into `data/`. The files
+remain local and are excluded from Git.
+
+To extract a real 100-sample CIFAR-10 subset:
+
+```powershell
+@'
+from poison_features import UniversalFeatureExtractor, load_image_dataset
+
+dataset = load_image_dataset("cifar10", train=True)
+bundle = UniversalFeatureExtractor(batch_size=32).extract_images(
+    dataset, labels=[dataset[i][1] for i in range(100)],
+    sample_ids=range(100), dataset_name="cifar10"
+)
+print(bundle.features.shape, bundle.labels.shape, bundle.sample_ids.shape)
+bundle.save("outputs/cifar10_first100.npz")
+'@ | & ".\.venv\Scripts\python.exe" -
+```
+
 The first real ResNet-18 extraction downloads ImageNet weights into the local
 cache. Data, weights, virtual environments, and generated `.npz` bundles are
 not committed.
