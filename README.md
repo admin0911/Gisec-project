@@ -44,6 +44,79 @@ normal 100-sample run, the PCA shape is `(100, 64)`.
 This downloads CIFAR-10 and MNIST train/test splits into `data/`. The files
 remain local and are excluded from Git.
 
+## Use your own datasets
+
+The built-in dataset names are only convenience adapters. You can use your
+own data without changing the extractor.
+
+### Custom image folders
+
+Arrange images into class directories:
+
+```text
+my_images/
+├── cat/
+│   ├── cat_001.jpg
+│   └── cat_002.png
+└── dog/
+    └── dog_001.jpg
+```
+
+Then load and extract them:
+
+```python
+from poison_features import UniversalFeatureExtractor, load_image_folder
+
+dataset = load_image_folder("data/my_images")
+bundle = UniversalFeatureExtractor().extract_images(
+    dataset,
+    dataset_name="my_images",
+    sample_ids=[path for path, _ in dataset.samples],
+)
+```
+
+`ImageFolder` assigns labels from the alphabetically ordered class folders.
+For unlabeled images, provide a small custom dataset that returns `(image, -1)`
+and pass stable IDs explicitly.
+
+### Custom text CSV
+
+Create a CSV with at least a `text` column:
+
+```csv
+text,label
+"This review is excellent",1
+"This review is poor",0
+```
+
+Load it with MiniLM:
+
+```python
+from poison_features import extract_text, load_text_table
+
+texts, labels, sample_ids = load_text_table(
+    "data/my_reviews.csv",
+    text_column="text",
+    label_column="label",
+)
+bundle = extract_text(
+    texts,
+    labels=labels,
+    sample_ids=sample_ids,
+    dataset_name="my_reviews",
+)
+```
+
+`.json` and `.jsonl` files are also supported. JSON rows should look like
+`{"text": "...", "label": 1}`. If no label column exists, labels are set to
+`-1`; this is suitable for unsupervised detectors but not label-aware ones.
+
+### Custom network-flow data
+
+Use `extract_packet_features` with a list of dictionaries containing the
+documented flow fields (`duration`, `packet_count`, `byte_count`, `protocol`,
+and so on). This supports structured CSV/JSON records, not raw PCAP files.
+
 To extract a real 100-sample CIFAR-10 subset:
 
 ```powershell
