@@ -18,6 +18,23 @@ competition project. It intentionally does not import the existing
 & ".\.venv\Scripts\python.exe" -m unittest discover -s tests -v
 ```
 
+For a real-data end-to-end smoke test (without downloading anything):
+
+```powershell
+& ".\.venv\Scripts\python.exe" verify_extractor.py
+```
+
+Expected output includes:
+
+```text
+cifar10: PASS; raw=(8, 512), PCA=(8, 7), visual=(8, 2)
+mnist: PASS; raw=(8, 512), PCA=(8, 7), visual=(8, 2)
+```
+
+The exact PCA dimension is `min(64, samples - 1, feature_dimension)`, so
+small smoke tests intentionally produce fewer than 64 PCA columns. For a
+normal 100-sample run, the PCA shape is `(100, 64)`.
+
 ## Download real image datasets
 
 ```powershell
