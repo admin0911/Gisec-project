@@ -469,6 +469,13 @@ Keep the pull request limited to detector files and tests. This minimizes
 merge conflicts. The maintainer should merge detector pull requests into
 `main`; do not copy files manually on submission day.
 
+Project policy requires an AI-assisted GitHub workflow for repository
+operations and code changes. Contributors should use an AI coding assistant to
+inspect the branch, make changes, run tests, review the diff, synchronize with
+`main`, and prepare the pull request. Contributors must still inspect the
+result and confirm that the tests pass; AI assistance does not replace human
+review.
+
 ### 6. Keep your branch current
 
 Before requesting review:

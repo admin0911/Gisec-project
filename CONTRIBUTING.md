@@ -3,6 +3,18 @@
 This repository is the shared feature-layer contract. Detector work should be
 isolated in a branch and merged through a pull request.
 
+## Required AI-assisted workflow
+
+All GitHub collaboration for this project must use an AI coding assistant for
+repository operations and code changes. Use it to inspect the current branch,
+create or update detector files, run the tests, review the diff, synchronize
+with `main`, and prepare the pull request. Do not make unreviewed manual edits
+directly on `main` or resolve conflicts by copying files blindly. The human
+author remains responsible for checking the generated diff and test results.
+
+This policy keeps detector contributions consistent and makes merge conflicts
+visible before submission.
+
 ## Before coding
 
 ```powershell
@@ -74,6 +86,7 @@ scoring must not read them.
 - [ ] `python -m unittest discover -s tests -v` passes
 - [ ] Pull request targets `main`
 - [ ] Description documents representation, threshold, runtime, and limitations
+- [ ] AI assistant was used to inspect, test, and review the contribution
 
 Keep changes narrow. Do not reformat or rewrite shared files while adding a
 detector. This is the primary protection against merge conflicts before the
