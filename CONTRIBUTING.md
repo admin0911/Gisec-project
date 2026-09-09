@@ -73,6 +73,15 @@ Completed image runs create matching `*-features.npz` and
 `FeatureBundle.load(...)` and `ImageInputBundle.load(...)` rather than
 re-encoding the dataset.
 
+### Comparing ResNet-18 and DINOv2
+
+For image detectors, the **Image features** selector can produce either
+`resnet18` (512D) or `dinov2` (384D). Keep the dataset split, sample IDs,
+attack, poison rate, seed, and detector settings identical when comparing
+them. The two runs are saved as separate artifacts because their feature
+spaces are not interchangeable. DINOv2 downloads its pretrained weights on
+first use and requires internet access then.
+
 The feature bundle and image bundle use the same stable `sample_ids`.
 Backdoor image bundles contain the patched post-attack pixels. Labels remain
 separate, and `is_poisoned`/`poison_type` are evaluation-only values: detector
