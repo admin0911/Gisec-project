@@ -205,8 +205,10 @@ results can be joined with embedding-based detectors.
 
 ### Full training runs, poison rates, and saved artifacts
 
-The local frontend keeps the small sample field for quick checks. Select
-**Whole training dataset** to process every row in the selected training split.
+The local frontend offers an **Extraction scope** selector. **Quick sample**
+shows a sample-count field for fast checks. **Whole training split** removes
+that field and processes every row in the selected training split; there is no
+hidden sample limit in this mode.
 For experiments, choose **Clean**, **1%**, **3%**, **5%**, or **10%** poisoning
 for either label flipping or the backdoor patch. Clean runs have no poisoned
 rows; attack metadata remains evaluation-only and is not included in detector

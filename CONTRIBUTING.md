@@ -41,6 +41,28 @@ Pass a `PoisonedImageDataset` to receive post-attack pixels. Do not put pixels
 into `FeatureBundle` vectors or use evaluation-only poison metadata while
 scoring.
 
+## Creating extraction runs
+
+The frontend's **Extraction scope** controls workload:
+
+- **Quick sample** uses the requested sample count and is the normal choice
+  while developing or debugging a detector.
+- **Whole training split** hides the sample-count control and processes every
+  row in the selected training split. The API equivalent is
+  `{"full_training": true}`.
+
+Choose **Clean**, **Label flip**, or **Backdoor patch**. For either attack,
+use only the provided 1%, 3%, 5%, or 10% poison rates. Clean runs have no
+poisoned rows. Completed image runs create matching `*-features.npz` and
+`*-images.npz` files under `artifacts/`; load them with
+`FeatureBundle.load(...)` and `ImageInputBundle.load(...)` rather than
+re-encoding the dataset.
+
+The feature bundle and image bundle use the same stable `sample_ids`.
+Backdoor image bundles contain the patched post-attack pixels. Labels remain
+separate, and `is_poisoned`/`poison_type` are evaluation-only values: detector
+scoring must not read them.
+
 ## Pull request checklist
 
 - [ ] New detector is in a new file under `detectors/`

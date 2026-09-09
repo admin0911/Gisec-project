@@ -8,8 +8,9 @@ function updateAttackOptions() {
 }
 $('dataset').onchange = updateAttackOptions;
 $('attack').onchange = updateAttackOptions;
-$('full-training').onchange = () => {
-  $('limit').disabled = $('full-training').checked;
+$('scope').onchange = () => {
+  const fullTraining = $('scope').value === 'full';
+  $('sample-control').hidden = fullTraining;
 };
 updateAttackOptions();
 function draw(points, labels) {
@@ -33,7 +34,7 @@ $('extract').onclick = async () => {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         dataset: $('dataset').value,
-        full_training: $('full-training').checked,
+        full_training: $('scope').value === 'full',
         limit: Number($('limit').value),
         attack: $('attack').value,
         poison_rate: Number($('poison-rate').value)
