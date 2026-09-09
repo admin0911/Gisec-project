@@ -13,6 +13,9 @@
       <p class="lede">Extract detector-ready representations from real datasets and inspect their 2D structure.</p>
       <section class="controls">
         <label>Dataset <select id="dataset"><option value="cifar10">CIFAR-10</option><option value="mnist">MNIST</option><option value="imdb">IMDB text</option></select></label>
+        <label id="encoder-control">Image features
+          <select id="encoder"><option value="resnet18">ResNet-18 (512D)</option><option value="dinov2">DINOv2 ViT-S/14 (384D)</option></select>
+        </label>
         <label>Extraction scope
           <select id="scope">
             <option value="sample">Quick sample</option>

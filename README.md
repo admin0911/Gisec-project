@@ -366,7 +366,7 @@ The extractor chooses an adapter from the explicit dataset/modality entry
 point; it does not guess from arbitrary file contents:
 
 ```text
-CIFAR-10 / MNIST images ──> ResNet-18 ───────┐
+CIFAR-10 / MNIST images ──> ResNet-18 or DINOv2 ─┐
 IMDB review text ─────────> MiniLM (384D) ────┼─> FeatureBundle
 CSV/JSON network flows ──> engineered fields ┘       │
                                                     ├─ features
@@ -379,6 +379,39 @@ Image datasets use `UniversalFeatureExtractor.extract_images`. IMDB uses
 `extract_text`, and structured packet/flow records use
 `extract_packet_features`. The detector layer should not select encoders; it
 only consumes a `DetectorInput`.
+
+### Comparing image representations
+
+Image extraction supports two interchangeable encoders:
+
+```python
+resnet_bundle = UniversalFeatureExtractor().extract_images(
+    dataset, dataset_name="cifar10", encoder="resnet18",
+    sample_ids=sample_ids,
+)
+dinov2_bundle = UniversalFeatureExtractor().extract_images(
+    dataset, dataset_name="cifar10", encoder="dinov2",
+    sample_ids=sample_ids,
+)
+```
+
+ResNet-18 produces 512-dimensional ImageNet features. DINOv2 uses the
+pretrained ViT-S/14 model and produces 384-dimensional features. Both return
+the same `FeatureBundle` fields, preserve row order and IDs, and keep labels
+and poison metadata separate. DINOv2 weights are downloaded and cached by
+PyTorch Hub on first use, so internet access is required for that first run.
+
+The frontend's **Image features** selector exposes both encoders for image
+datasets. Saved artifact names include the encoder, for example:
+
+```text
+cifar10-train-100-resnet18-...-features.npz
+cifar10-train-100-dinov2-...-features.npz
+```
+
+For a fair comparison, use the same split, sample IDs, attack, poison rate,
+seed, and detector settings with each bundle. Their feature spaces are
+different and must not be mixed.
 
 ### Text poisoning modes
 

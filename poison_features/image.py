@@ -91,3 +91,60 @@ class ResNet18ImageEncoder:
         if result.shape[1] != 512 or not np.isfinite(result).all():
             raise RuntimeError("ResNet-18 returned invalid features")
         return result
+
+
+class DINOv2ImageEncoder(ResNet18ImageEncoder):
+    """Extract frozen 384-dimensional DINOv2 ViT-S/14 embeddings."""
+
+    def __init__(self, device: str | None = None, weights_dir: str | Path = "artifacts/weights"):
+        try:
+            import torch
+            from torchvision.transforms import InterpolationMode, Normalize, Resize
+        except ImportError as exc:
+            raise RuntimeError(
+                "DINOv2 extraction requires torch and torchvision; install requirements.txt"
+            ) from exc
+        self.torch = torch
+        requested = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(requested)
+        if self.device.type == "cuda" and not torch.cuda.is_available():
+            raise ValueError("CUDA was requested but is not available")
+        Path(weights_dir).mkdir(parents=True, exist_ok=True)
+        try:
+            model = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")
+        except Exception as exc:
+            raise RuntimeError(
+                "DINOv2 weights could not be loaded. Check internet access or the torch hub cache."
+            ) from exc
+        self.model = model.to(self.device).eval().requires_grad_(False)
+        self.transform = lambda image: Normalize(
+            [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+        )(Resize((224, 224), interpolation=InterpolationMode.BICUBIC)(image))
+        self._to_tensor = __import__("torchvision").transforms.functional.to_tensor
+
+    def extract(self, dataset: Any, batch_size: int = 128, progress: Any = None) -> np.ndarray:
+        from torch.utils.data import DataLoader, Dataset
+
+        if batch_size < 1:
+            raise ValueError("batch_size must be positive")
+        encoder = self
+
+        class Images(Dataset):
+            def __len__(self) -> int:
+                return len(dataset)
+
+            def __getitem__(self, index: int) -> Any:
+                item = dataset[index]
+                return encoder._prepare(item[0] if isinstance(item, (tuple, list)) else item)
+
+        loader = DataLoader(Images(), batch_size=batch_size, shuffle=False, num_workers=0)
+        chunks = []
+        with self.torch.inference_mode():
+            for images in loader:
+                chunks.append(self.model(images.to(self.device)).cpu().numpy())
+                if progress:
+                    progress(sum(len(chunk) for chunk in chunks), len(dataset))
+        result = np.concatenate(chunks).astype(np.float32)
+        if result.shape[1] != 384 or not np.isfinite(result).all():
+            raise RuntimeError("DINOv2 returned invalid features")
+        return result

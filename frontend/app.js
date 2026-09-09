@@ -1,5 +1,7 @@
 const $ = id => document.getElementById(id);
 function updateAttackOptions() {
+  const imageDataset = $('dataset').value !== 'imdb';
+  $('encoder-control').hidden = !imageDataset;
   $('attack').disabled = false;
   $('poison-rate').disabled = $('attack').value === 'none';
   const blended = $('attack').value === 'blended_injection';
@@ -37,6 +39,7 @@ $('extract').onclick = async () => {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         dataset: $('dataset').value,
+        encoder: $('encoder').value,
         full_training: $('scope').value === 'full',
         limit: Number($('limit').value),
         attack: $('attack').value,

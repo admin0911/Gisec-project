@@ -103,6 +103,9 @@ def run_extraction(job_id: str, request: dict) -> None:
         if limit is not None and limit < 2:
             raise ValueError("limit must be at least 2")
         attack = request.get("attack", "none")
+        encoder = request.get("encoder", "resnet18")
+        if encoder not in {"resnet18", "dinov2"}:
+            raise ValueError("encoder must be 'resnet18' or 'dinov2'")
         poison_rate = float(request.get("poison_rate", 0.05))
         target_label = int(request.get("target_label", 0))
         blend_alpha = float(request.get("blend_alpha", 0.10))
@@ -118,7 +121,8 @@ def run_extraction(job_id: str, request: dict) -> None:
         size_key = "full" if full_training else str(limit)
         rate_key = f"{poison_rate:.2f}".replace(".", "")
         attack_key = f"{attack}-a{blend_alpha:.2f}-t{target_label}-n{poison_count or 'rate'}"
-        stem = f"{name}-{split}-{size_key}-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
+        encoder_key = encoder if name != "imdb" else "minilm"
+        stem = f"{name}-{split}-{size_key}-{encoder_key}-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
         feature_path = artifacts / f"{stem}-features.npz"
         image_path = artifacts / f"{stem}-images.npz"
         if feature_path.exists():
@@ -182,9 +186,11 @@ def run_extraction(job_id: str, request: dict) -> None:
             update_job(job_id, progress=5 + int(done / count * 85), message=f"Encoded {done:,} of {count:,} samples")
 
         bundle = UniversalFeatureExtractor(batch_size=32).extract_images(
-            dataset, labels=labels, sample_ids=sample_ids, dataset_name=name, progress=progress,
+            dataset, labels=labels, sample_ids=sample_ids, dataset_name=name,
+            encoder=encoder, progress=progress,
         )
         bundle.metadata.update({
+            "encoder": encoder,
             "attack": attack,
             "poison_rate": poison_rate,
             "target_label": target_label,
