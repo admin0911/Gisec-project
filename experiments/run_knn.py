@@ -1,7 +1,7 @@
 """Run kNN on a locally generated FeatureBundle; no extraction or training.
 
 From the repository root:
-python -m detectors.run_knn artifacts/NAME-features.npz
+python -m experiments.run_knn artifacts/NAME-features.npz
 Use --known-clean only when you independently know the input is clean.
 Default raw means encoder embeddings. Threshold 0.95 is provisional.
 """
@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 import numpy as np
 from poison_features import FeatureBundle, detector_input
-from detectors.knn_label_agreement import KNNLabelAgreement
+from detectors.label_flip.knn_label_agreement import KNNLabelAgreement
 
 
 def evaluation(flags, truth):
@@ -80,4 +80,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

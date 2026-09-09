@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from poison_features import DetectorInput, FeatureBundle, detector_input
-from detectors.knn_label_agreement import KNNLabelAgreement
+from detectors.label_flip.knn_label_agreement import KNNLabelAgreement
 
 
 class KNNTests(unittest.TestCase):

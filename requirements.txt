@@ -1,5 +1,7 @@
-numpy>=1.26
-scikit-learn>=1.4
+# Shared versions validated for the label-flip detectors and cleanlab 2.7.1.
+numpy==1.26.4
+scikit-learn==1.7.2
+cleanlab==2.7.1
 tqdm>=4.66
 pillow>=10.0
 torch>=2.2

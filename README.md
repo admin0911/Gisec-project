@@ -1,5 +1,8 @@
 # Gisec Project - PoisonGuard Feature Layer
 
+For label-flip detectors, the shared output connector, and saved-feature run
+commands, see the [detector code guide](docs/detectors/README.md).
+
 This is a standalone module created for merging into the wider PoisonGuard
 competition project. It intentionally does not import the existing
 `PoisonGuard-main` feature extractor.
