@@ -27,6 +27,25 @@ class ImageInputBundle:
         if not (len(self.images) == len(self.labels) == len(self.sample_ids)):
             raise ValueError("images, labels, and sample_ids must have equal lengths")
 
+    def save(self, path: str) -> None:
+        """Save aligned pixels and public row metadata."""
+        np.savez_compressed(
+            path,
+            images=self.images,
+            labels=self.labels,
+            sample_ids=self.sample_ids,
+        )
+
+    @classmethod
+    def load(cls, path: str) -> "ImageInputBundle":
+        """Load an image bundle produced by :meth:`save`."""
+        with np.load(path, allow_pickle=False) as archive:
+            return cls(
+                images=archive["images"],
+                labels=archive["labels"],
+                sample_ids=archive["sample_ids"],
+            )
+
 
 def _to_chw_float(image: Any) -> np.ndarray:
     from PIL import Image

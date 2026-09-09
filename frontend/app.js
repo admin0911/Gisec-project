@@ -1,11 +1,16 @@
 const $ = id => document.getElementById(id);
 function updateAttackOptions() {
   $('attack').disabled = false;
+  $('poison-rate').disabled = $('attack').value === 'none';
   $('status').textContent = $('dataset').value === 'imdb'
     ? 'IMDB uses MiniLM; text attacks add labels or a phrase trigger.'
     : 'Ready';
 }
 $('dataset').onchange = updateAttackOptions;
+$('attack').onchange = updateAttackOptions;
+$('full-training').onchange = () => {
+  $('limit').disabled = $('full-training').checked;
+};
 updateAttackOptions();
 function draw(points, labels) {
   const canvas = $('plot'), ctx = canvas.getContext('2d');
@@ -26,12 +31,21 @@ $('extract').onclick = async () => {
   try {
     const response = await fetch('/api/extract', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({dataset: $('dataset').value, limit: Number($('limit').value), attack: $('attack').value})
+      body: JSON.stringify({
+        dataset: $('dataset').value,
+        full_training: $('full-training').checked,
+        limit: Number($('limit').value),
+        attack: $('attack').value,
+        poison_rate: Number($('poison-rate').value)
+      })
     });
     const job = await response.json();
     if (!response.ok) throw new Error(job.error || 'Extraction failed');
     const data = await waitForJob(job.job_id);
     $('summary').textContent = `${data.dataset}: ${data.samples} samples · ${data.feature_dim}D raw · ${data.reduced_dim}D PCA`;
+    $('artifacts').textContent = data.feature_file
+      ? `Saved for reuse: ${data.feature_file}${data.image_file ? ` · images: ${data.image_file}` : ''}`
+      : '';
     $('result').hidden = false; draw(data.visual_features, data.labels);
     $('status').textContent = data.poisoned === null ? 'Extraction complete' : `Extraction complete · ${data.poisoned} poisoned samples`;
   } catch (error) { $('status').textContent = `Error: ${error.message}`; }

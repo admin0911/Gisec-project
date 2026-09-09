@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import torch
@@ -22,6 +24,16 @@ class ImageInputTests(unittest.TestCase):
             expected = 1.0 if is_poisoned else 0.0
             self.assertEqual(float(inputs.images[index, :, -1, -1].max()), expected)
         self.assertEqual(inputs.images.shape, (4, 1, 8, 8))
+
+    def test_image_bundle_round_trip(self):
+        dataset = [(torch.zeros(1, 8, 8), 1)]
+        inputs = load_image_inputs(dataset, sample_ids=["row-0"])
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "images.npz"
+            inputs.save(path)
+            loaded = type(inputs).load(path)
+        np.testing.assert_array_equal(loaded.images, inputs.images)
+        np.testing.assert_array_equal(loaded.sample_ids, inputs.sample_ids)
 
 
 if __name__ == "__main__":

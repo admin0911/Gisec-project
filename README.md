@@ -203,6 +203,37 @@ patch. This makes the same API suitable for clean and poisoned MNIST/CIFAR-10
 inputs. Pixel detectors must use `sample_ids` when returning scores so their
 results can be joined with embedding-based detectors.
 
+### Full training runs, poison rates, and saved artifacts
+
+The local frontend keeps the small sample field for quick checks. Select
+**Whole training dataset** to process every row in the selected training split.
+For experiments, choose **Clean**, **1%**, **3%**, **5%**, or **10%** poisoning
+for either label flipping or the backdoor patch. Clean runs have no poisoned
+rows; attack metadata remains evaluation-only and is not included in detector
+inputs.
+
+Each completed run is saved under `artifacts/` as:
+
+```text
+*-features.npz  # FeatureBundle: embeddings, scaled/PCA data, labels, IDs
+*-images.npz    # ImageInputBundle: post-attack NCHW pixels, labels, IDs
+```
+
+Repeat the same request to load the existing feature bundle instead of
+re-encoding it. You can also load files directly:
+
+```python
+from poison_features import FeatureBundle, ImageInputBundle
+
+features = FeatureBundle.load("artifacts/<run>-features.npz")
+pixels = ImageInputBundle.load("artifacts/<run>-images.npz")
+```
+
+`features.sample_ids` and `pixels.sample_ids` are identical, and labels are
+stored separately from both representations. For backdoor runs, the saved
+images include the white trigger patches; poison ground truth is available
+only on `features.is_poisoned`/`features.poison_type` for evaluation.
+
 ## What do the extracted features mean?
 
 For images, a feature is a learned numeric measurement produced by the
