@@ -210,9 +210,48 @@ shows a sample-count field for fast checks. **Whole training split** removes
 that field and processes every row in the selected training split; there is no
 hidden sample limit in this mode.
 For experiments, choose **Clean**, **1%**, **3%**, **5%**, or **10%** poisoning
-for either label flipping or the backdoor patch. Clean runs have no poisoned
-rows; attack metadata remains evaluation-only and is not included in detector
-inputs.
+for label flipping, the backdoor patch, or blended noise injection. Clean runs
+have no poisoned rows; attack metadata remains evaluation-only and is not
+included in detector inputs.
+
+### Blended injection experiment
+
+**Blended noise injection** creates one deterministic random noise pattern,
+blends it into selected images, and changes their labels to the target class.
+The default blend strength is `alpha=0.10` and the default target is class
+`0` (airplane in CIFAR-10). Selected rows are drawn from non-target classes
+when enough rows are available, so the experiment represents a mixed-class
+training attack. A full CIFAR-10 run at 3% selects approximately 1,500 of
+50,000 training images; the UI also supports 1%, 5%, and 10%.
+
+The resulting image is:
+
+```text
+poisoned = (1 - alpha) * clean_image + alpha * shared_noise_pattern
+```
+
+The saved image bundle contains these post-injection pixels and the saved
+feature bundle contains the changed labels plus evaluation-only poison
+metadata. The noise pattern itself is not passed to detectors as ground truth.
+This is an experiment generator, not an automatic claim that a real dataset
+contains a blended attack.
+
+#### What a detector should use
+
+The extractor provides the detector with:
+
+- post-injection `NCHW` pixels through `ImageInputBundle`;
+- ResNet-18 embeddings, scaled features, and PCA features;
+- current labels separately from all representations;
+- stable sample IDs for joining pixel and embedding scores.
+
+Because alpha `0.10` is intentionally subtle, a detector should not rely only
+on semantic ResNet coordinates. A relevant detector can compare high-frequency
+or color residual statistics across many samples, search for a shared
+low-amplitude direction, measure image-to-image consistency in frequency space,
+and check whether a weak visual pattern is disproportionately associated with
+the target label. It must learn these signals from `images`/features and
+labels only; `is_poisoned` and `poison_type` are for evaluation after scoring.
 
 Each completed run is saved under `artifacts/` as:
 

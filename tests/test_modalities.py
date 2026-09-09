@@ -36,6 +36,28 @@ class ModalityTests(unittest.TestCase):
         self.assertEqual(bundle.reduced_features.shape, (3, 2))
         self.assertTrue(np.isfinite(bundle.scaled_features).all())
 
+    def test_blended_injection_uses_shared_noise_and_target_label(self):
+        import torch
+
+        dataset = [(torch.full((3, 8, 8), 0.2), label) for label in [1, 2, 3, 4]]
+        poisoned = poison_dataset(
+            dataset,
+            "blended_injection",
+            poison_count=2,
+            target_label=0,
+            blend_alpha=0.10,
+            seed=4,
+        )
+        changed = [
+            poisoned[index][0] - dataset[index][0]
+            for index in range(len(dataset))
+            if poisoned.metadata.is_poisoned[index]
+        ]
+        self.assertEqual(int(poisoned.metadata.is_poisoned.sum()), 2)
+        self.assertTrue(np.all(poisoned.metadata.current_labels[poisoned.metadata.is_poisoned] == 0))
+        self.assertTrue(torch.allclose(changed[0], changed[1]))
+        self.assertLess(float(changed[0].abs().max()), 0.1)
+
 
 if __name__ == "__main__":
     unittest.main()

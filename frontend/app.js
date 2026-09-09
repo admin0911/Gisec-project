@@ -2,6 +2,9 @@ const $ = id => document.getElementById(id);
 function updateAttackOptions() {
   $('attack').disabled = false;
   $('poison-rate').disabled = $('attack').value === 'none';
+  const blended = $('attack').value === 'blended_injection';
+  $('target-control').hidden = !blended;
+  $('alpha-control').hidden = !blended;
   $('status').textContent = $('dataset').value === 'imdb'
     ? 'IMDB uses MiniLM; text attacks add labels or a phrase trigger.'
     : 'Ready';
@@ -37,7 +40,9 @@ $('extract').onclick = async () => {
         full_training: $('scope').value === 'full',
         limit: Number($('limit').value),
         attack: $('attack').value,
-        poison_rate: Number($('poison-rate').value)
+        poison_rate: Number($('poison-rate').value),
+        target_label: Number($('target-label').value),
+        blend_alpha: Number($('blend-alpha').value)
       })
     });
     const job = await response.json();
