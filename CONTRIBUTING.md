@@ -24,12 +24,30 @@ scores = detector.score(inputs)
 `inputs.y` is present only for label-aware detectors. Evaluation-only poison
 metadata must not be read during scoring.
 
+### Pixel-based image detectors
+
+Detectors that need raw pixels must use the separate image connector:
+
+```python
+from poison_features import load_image_inputs
+
+pixels = load_image_inputs(dataset, sample_ids=my_ids)
+scores = detector.score(pixels.images)
+```
+
+`pixels.images` is a float32 `NCHW` array in the original image dimensions,
+while `pixels.sample_ids` and `pixels.labels` remain separate and aligned.
+Pass a `PoisonedImageDataset` to receive post-attack pixels. Do not put pixels
+into `FeatureBundle` vectors or use evaluation-only poison metadata while
+scoring.
+
 ## Pull request checklist
 
 - [ ] New detector is in a new file under `detectors/`
 - [ ] Tests are in `tests/`
 - [ ] Scores are finite and one-dimensional with one value per sample
 - [ ] Sample IDs are returned unchanged
+- [ ] Pixel detectors use `load_image_inputs` rather than embedding pixels
 - [ ] No datasets, virtual environments, weights, or generated outputs committed
 - [ ] `python -m unittest discover -s tests -v` passes
 - [ ] Pull request targets `main`
