@@ -63,9 +63,12 @@ The frontend's **Extraction scope** controls workload:
   row in the selected training split. The API equivalent is
   `{"full_training": true}`.
 
-Choose **Clean**, **Label flip**, or **Backdoor patch**. For either attack,
-use only the provided 1%, 3%, 5%, or 10% poison rates. Clean runs have no
-poisoned rows. Completed image runs create matching `*-features.npz` and
+Choose **Clean**, **Label flip**, **Backdoor patch**, or **Blended noise
+injection**. For attacks, use only the provided 1%, 3%, 5%, or 10% poison
+rates. Clean runs have no poisoned rows. Blended injection uses a shared
+low-amplitude noise pattern, default `alpha=0.10`, and target label `0`
+(airplane for CIFAR-10); a full 3% CIFAR-10 run is approximately 1,500 rows.
+Completed image runs create matching `*-features.npz` and
 `*-images.npz` files under `artifacts/`; load them with
 `FeatureBundle.load(...)` and `ImageInputBundle.load(...)` rather than
 re-encoding the dataset.
@@ -74,6 +77,25 @@ The feature bundle and image bundle use the same stable `sample_ids`.
 Backdoor image bundles contain the patched post-attack pixels. Labels remain
 separate, and `is_poisoned`/`poison_type` are evaluation-only values: detector
 scoring must not read them.
+
+For blended-injection detectors, use the saved post-injection pixels as well
+as embeddings. Look for weak shared residual or frequency signals across
+many samples and their association with the target label. Do not expect a
+single image or a single ResNet coordinate to reveal a 10% blend reliably.
+
+### Blended-injection detector checklist
+
+- [ ] Create branch `detector/blended-injection`
+- [ ] Begin with a 3% CIFAR-10 blended run, target `0`, `alpha=0.10`
+- [ ] Load matching `*-features.npz` and `*-images.npz` artifacts
+- [ ] Use pixels, embeddings, current labels, and stable sample IDs
+- [ ] Search for shared weak residual or frequency signals across samples
+- [ ] Return one finite suspicion score per sample
+- [ ] Preserve sample IDs and keep poison metadata out of scoring
+- [ ] Test clean data and 1%, 3%, 5%, and 10% blended runs
+- [ ] Add implementation under `detectors/` and tests under `tests/`
+- [ ] Run `python -m unittest discover -s tests -v`
+- [ ] Open a pull request into `main`
 
 ## Pull request checklist
 
