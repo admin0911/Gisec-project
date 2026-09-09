@@ -12,6 +12,15 @@
 Start with [CONNECTOR.md](CONNECTOR.md) for integration, or
 [CONFIDENT_LEARNING.md](label_flip/CONFIDENT_LEARNING.md) for label-flip experiment setup.
 
+For the optional DINOv2 extractor and paired ResNet18 comparison, see
+[FEATURE_COMPARISON.md](label_flip/FEATURE_COMPARISON.md).
+
+For post-scan actions, dataset views, and quarantine manifests, see
+[CLEANING.md](label_flip/CLEANING.md).
+
+For the current two-encoder label-flip assessment (before final cleaning), see
+[ASSESSMENT.md](label_flip/ASSESSMENT.md).
+
 ## Running saved-feature experiments: `experiments/`
 
 Run from the repository root with the appropriate Python environment:

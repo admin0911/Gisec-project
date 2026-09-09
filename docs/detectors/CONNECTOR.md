@@ -40,6 +40,29 @@ Backdoor detectors can call `detector_result(...)` with their own outputs and
 settings. They must supply only detector evidence, never poison ground truth.
 Their combined decisions remain separate from this label-flip preset.
 
+## Receiving both image feature files
+
+```python
+from detectors.label_flip.feature_inputs import load_paired_feature_inputs
+
+inputs = load_paired_feature_inputs("path/to/resnet-features.npz",
+                                   "path/to/dino-features.npz")
+resnet_inputs = inputs["resnet18"]
+dino_inputs = inputs["dinov2_vits14"]
+```
+
+Both paths must be trusted local `FeatureBundle.save()` outputs. This adapter
+checks the encoders, feature dimensions, dataset name, IDs, row order and supplied
+labels. It returns separate raw feature inputs; it never merges vectors or
+passes known poison identities to detectors. Matching IDs cannot verify the
+pixels themselves: extraction must use the same dataset version for both files.
+The filename convention is up to the extraction service.
+The adapter accepts both `dinov2` (frontend) and `dinov2_vits14` (earlier Python
+experiments) as encoder names; the returned dictionary uses `dinov2_vits14`.
+
+This prepares inputs only. DINOv2 scoring needs its own calibrated thresholds;
+do not pass DINOv2 inputs to the fixed ResNet18 pipeline preset.
+
 Run the connector tests with:
 ```powershell
 python -m unittest discover -s tests -p test_output_connector.py -v

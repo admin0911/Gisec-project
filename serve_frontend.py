@@ -180,7 +180,8 @@ def run_extraction(job_id: str, request: dict) -> None:
         sample_ids = __import__("numpy").asarray([f"{name}-{split}:{i}" for i in range(total)])
         image_inputs = load_image_inputs(dataset, sample_ids=sample_ids)
         image_inputs.save(image_path)
-        update_job(job_id, progress=5, message=f"Extracting {total:,} samples with ResNet-18")
+        encoder_label = 'ResNet-18' if encoder == 'resnet18' else 'DINOv2'
+        update_job(job_id, progress=5, message=f"Extracting {total:,} samples with {encoder_label}")
 
         def progress(done, count):
             update_job(job_id, progress=5 + int(done / count * 85), message=f"Encoded {done:,} of {count:,} samples")
