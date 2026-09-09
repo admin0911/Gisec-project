@@ -398,8 +398,9 @@ the same `FeatureBundle` fields, preserve row order and IDs, and keep labels
 and poison metadata separate. DINOv2 weights are downloaded and cached by
 PyTorch Hub on first use, so internet access is required for that first run.
 
-The frontend's **Image features** selector exposes both encoders for image
-datasets. Saved artifact names include the encoder, for example:
+For CIFAR-10, the frontend automatically extracts both encoders; no encoder
+selection is required. For MNIST, the **Image features** selector lets you
+choose one encoder. Saved artifact names include the encoder, for example:
 
 ```text
 cifar10-train-100-resnet18-...-features.npz
@@ -409,6 +410,15 @@ cifar10-train-100-dinov2-...-features.npz
 For a fair comparison, use the same split, sample IDs, attack, poison rate,
 seed, and detector settings with each bundle. Their feature spaces are
 different and must not be mixed.
+
+### Reusing clean features
+
+Clean image extraction is the reusable baseline. When a label-flip experiment
+uses the same dataset, split, size, seed, and encoder, the server loads the
+clean feature bundle and changes only the labels and evaluation metadata; it
+does not run the image encoder again. Clean pixels are reused as well. This is
+valid because label flipping changes labels, not image pixels. Backdoor,
+blended-injection, and other pixel-changing attacks must be encoded again.
 
 ### Text poisoning modes
 
