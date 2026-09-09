@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 function updateAttackOptions() {
-  const imageDataset = $('dataset').value !== 'imdb';
+  const imageDataset = $('dataset').value === 'mnist';
   $('encoder-control').hidden = !imageDataset;
   $('attack').disabled = false;
   $('poison-rate').disabled = $('attack').value === 'none';
@@ -54,9 +54,12 @@ $('extract').onclick = async () => {
     const job = await response.json();
     if (!response.ok) throw new Error(job.error || 'Extraction failed');
     const data = await waitForJob(job.job_id);
-    $('summary').textContent = `${data.dataset}: ${data.samples} samples · ${data.feature_dim}D raw · ${data.reduced_dim}D PCA`;
+    const representations = data.representations || [data];
+    $('summary').textContent = representations
+      .map(item => `${item.encoder || 'minilm'}: ${item.samples} samples · ${item.feature_dim}D raw · ${item.reduced_dim}D PCA`)
+      .join(' | ');
     $('artifacts').textContent = data.feature_file
-      ? `Saved for reuse: ${data.feature_file}${data.image_file ? ` · images: ${data.image_file}` : ''}`
+      ? `Saved for reuse: ${representations.map(item => `${item.feature_file}${item.image_file ? ` · images: ${item.image_file}` : ''}`).join(' | ')}`
       : '';
     $('result').hidden = false; draw(data.visual_features, data.labels);
     $('status').textContent = data.poisoned === null ? 'Extraction complete' : `Extraction complete · ${data.poisoned} poisoned samples`;

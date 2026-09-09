@@ -8,6 +8,8 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import numpy as np
+
 from poison_features import (
     FeatureBundle,
     ImageInputBundle,
@@ -106,6 +108,8 @@ def update_job(job_id: str, **changes) -> None:
 
 def bundle_result(bundle: FeatureBundle, feature_path: Path, image_path: Path | None) -> dict:
     return {
+        # Leila: identify each encoder in the combined extraction response.
+        "encoder": bundle.encoder,
         "dataset": bundle.dataset_name,
         "samples": len(bundle.features),
         "feature_dim": bundle.original_feature_dim,
@@ -148,22 +152,20 @@ def run_extraction(job_id: str, request: dict) -> None:
         size_key = "full" if full_training else str(limit)
         rate_key = f"{poison_rate:.2f}".replace(".", "")
         attack_key = f"{attack}-a{blend_alpha:.2f}-t{target_label}-n{poison_count or 'rate'}"
-        encoder_key = encoder if name != "imdb" else "minilm"
-        stem = f"{name}-{split}-{size_key}-{encoder_key}-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
-        feature_path = artifacts / f"{stem}-features.npz"
-        image_path = artifacts / f"{stem}-images.npz"
-        if feature_path.exists():
-            bundle = FeatureBundle.load(feature_path)
-            update_job(
-                job_id,
-                status="complete",
-                progress=100,
-                message="Loaded saved extraction",
-                result=bundle_result(bundle, feature_path, image_path if image_path.exists() else None),
-            )
-            return
         update_job(job_id, status="running", progress=2, message="Loading dataset")
         if name == "imdb":
+            stem = f"{name}-{split}-{size_key}-minilm-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
+            feature_path = artifacts / f"{stem}-features.npz"
+            if feature_path.exists():
+                bundle = FeatureBundle.load(feature_path)
+                update_job(
+                    job_id,
+                    status="complete",
+                    progress=100,
+                    message="Loaded saved extraction",
+                    result=bundle_result(bundle, feature_path, None),
+                )
+                return
             update_job(job_id, status="running", progress=2, message="Loading IMDB reviews")
             data = load_imdb_dataset(split=split)
             rng = __import__("numpy").random.default_rng(int(request.get("seed", 0)))
@@ -191,8 +193,14 @@ def run_extraction(job_id: str, request: dict) -> None:
             update_job(job_id, status="complete", progress=100, message="Extraction complete", result=result)
             return
         dataset = load_image_dataset(name, train=split == "train")
+        clean_dataset = (
+            __import__("torch").utils.data.Subset(dataset, range(limit))
+            if limit is not None and limit < len(dataset)
+            else dataset
+        )
+        attacked_dataset = clean_dataset
         if attack != "none":
-            dataset = poison_dataset(
+            attacked_dataset = poison_dataset(
                 dataset, attack,
                 poison_rate=poison_rate,
                 target_label=target_label,
@@ -200,35 +208,84 @@ def run_extraction(job_id: str, request: dict) -> None:
                 poison_count=poison_count,
                 seed=int(request.get("seed", 0)),
             )
-        if limit is not None and limit < len(dataset):
-            dataset = dataset.take(limit) if attack != "none" else __import__("torch").utils.data.Subset(dataset, range(limit))
-        labels = [dataset[i][1] for i in range(len(dataset))]
-        total = len(dataset)
-        sample_ids = __import__("numpy").asarray([f"{name}-{split}:{i}" for i in range(total)])
-        image_inputs = load_image_inputs(dataset, sample_ids=sample_ids)
-        image_inputs.save(image_path)
-        encoder_label = 'ResNet-18' if encoder == 'resnet18' else 'DINOv2'
-        update_job(job_id, progress=5, message=f"Extracting {total:,} samples with {encoder_label}")
+            # Leila: retain main's dual-encoder workflow and aligned attacked rows.
+            if limit is not None and limit < len(attacked_dataset):
+                attacked_dataset = attacked_dataset.take(limit)
+        total = len(clean_dataset)
+        sample_ids = np.asarray([f"{name}-{split}:{i}" for i in range(total)])
+        labels = np.asarray([attacked_dataset[i][1] for i in range(total)])
+        metadata = getattr(attacked_dataset, "metadata", None)
+        encoders = ["resnet18", "dinov2"] if name == "cifar10" else [encoder]
+        results = []
+        clean_images_path = artifacts / f"{name}-{split}-{size_key}-images.npz"
+        if not clean_images_path.exists():
+            load_image_inputs(clean_dataset, sample_ids=sample_ids).save(clean_images_path)
 
-        def progress(done, count):
-            update_job(job_id, progress=5 + int(done / count * 85), message=f"Encoded {done:,} of {count:,} samples")
+        for encoder_name in encoders:
+            encoder_key = encoder_name
+            clean_stem = f"{name}-{split}-{size_key}-{encoder_key}-none-a{0.0:.2f}-t0-nrate-000-seed{int(request.get('seed', 0))}"
+            clean_feature_path = artifacts / f"{clean_stem}-features.npz"
+            # Leila: separate poison rates and make clean runs reusable by label flips.
+            attack_stem = clean_stem if attack == "none" else f"{name}-{split}-{size_key}-{encoder_key}-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
+            feature_path = artifacts / f"{attack_stem}-features.npz"
+            image_path = artifacts / f"{attack_stem}-images.npz"
+            if attack == "label_flip" and clean_feature_path.exists():
+                base = FeatureBundle.load(clean_feature_path)
+                # Leila: cached features must describe these exact original rows.
+                if (not np.array_equal(base.sample_ids,sample_ids) or len(base.labels) != total
+                        or (metadata is not None and not np.array_equal(base.labels,metadata.original_labels[:total]))):
+                    raise ValueError('Cached clean feature rows do not match the requested input.')
+                bundle = FeatureBundle(
+                    features=base.features,
+                    scaled_features=base.scaled_features,
+                    reduced_features=base.reduced_features,
+                    labels=labels,
+                    sample_ids=sample_ids,
+                    modality=base.modality,
+                    encoder=base.encoder,
+                    dataset_name=base.dataset_name,
+                    visual_features=base.visual_features,
+                    original_labels=None if metadata is None else metadata.original_labels[:total],
+                    is_poisoned=None if metadata is None else metadata.is_poisoned[:total],
+                    poison_type=None if metadata is None else metadata.poison_type[:total],
+                    # Leila: replace clean-run truth with this attack's evaluation metadata.
+                    metadata={**(base.metadata or {}), "attack": attack, "reused_clean_features": True,
+                        "poison_rate": poison_rate, "target_label": target_label, "blend_alpha": blend_alpha,
+                        "poison_count": 0 if metadata is None else int(metadata.is_poisoned[:total].sum())},
+                )
+                bundle.save(feature_path)
+                # Leila: label flipping preserves pixels but image labels must match features.
+                load_image_inputs(attacked_dataset, sample_ids=sample_ids).save(image_path)
+            elif feature_path.exists():
+                bundle = FeatureBundle.load(feature_path)
+            else:
+                source = clean_dataset if attack == "none" else attacked_dataset
+                update_job(job_id, progress=5, message=f"Extracting {encoder_name} features")
 
-        bundle = UniversalFeatureExtractor(batch_size=32).extract_images(
-            dataset, labels=labels, sample_ids=sample_ids, dataset_name=name,
-            encoder=encoder, progress=progress,
-        )
-        bundle.metadata.update({
-            "encoder": encoder,
-            "attack": attack,
-            "poison_rate": poison_rate,
-            "target_label": target_label,
-            "blend_alpha": blend_alpha,
-            "poison_count": int(bundle.is_poisoned.sum()) if bundle.is_poisoned is not None else 0,
-        })
-        bundle.save(feature_path)
+                def progress(done, count):
+                    update_job(job_id, progress=5 + int(done / count * 85), message=f"{encoder_name}: encoded {done:,} of {count:,}")
+
+                bundle = UniversalFeatureExtractor(batch_size=32).extract_images(
+                    source, labels=labels, sample_ids=sample_ids, dataset_name=name,
+                    encoder=encoder_name, progress=progress,
+                )
+                bundle.metadata.update({
+                    "encoder": encoder_name,
+                    "attack": attack,
+                    "poison_rate": poison_rate,
+                    "target_label": target_label,
+                    "blend_alpha": blend_alpha,
+                    "poison_count": int(bundle.is_poisoned.sum()) if bundle.is_poisoned is not None else 0,
+                })
+                bundle.save(feature_path)
+                if not image_path.exists():
+                    load_image_inputs(source, sample_ids=sample_ids).save(image_path)
+            results.append(bundle_result(bundle, feature_path, image_path))
         update_job(job_id, progress=95, message="Preparing PCA visualization")
-        result = bundle_result(bundle, feature_path, image_path)
-        update_job(job_id, status="complete", progress=100, message="Extraction complete", result=result)
+        # Leila: copy the primary result so the JSON response has no circular reference.
+        primary = dict(results[0])
+        primary["representations"] = results
+        update_job(job_id, status="complete", progress=100, message="Extraction complete", result=primary)
     except Exception as exc:
         update_job(job_id, status="error", progress=100, message=str(exc))
 

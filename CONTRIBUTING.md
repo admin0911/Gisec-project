@@ -75,12 +75,17 @@ re-encoding the dataset.
 
 ### Comparing ResNet-18 and DINOv2
 
-For image detectors, the **Image features** selector can produce either
-`resnet18` (512D) or `dinov2` (384D). Keep the dataset split, sample IDs,
+For image detectors, CIFAR-10 automatically produces both `resnet18` (512D)
+and `dinov2` (384D); MNIST uses the **Image features** selector to choose one.
+Keep the dataset split, sample IDs,
 attack, poison rate, seed, and detector settings identical when comparing
 them. The two runs are saved as separate artifacts because their feature
 spaces are not interchangeable. DINOv2 downloads its pretrained weights on
 first use and requires internet access then.
+
+Label-flip runs reuse matching clean feature and image artifacts and only
+replace labels plus evaluation metadata. Pixel-changing attacks such as
+backdoors and blended injection must be re-encoded.
 
 The feature bundle and image bundle use the same stable `sample_ids`.
 Backdoor image bundles contain the patched post-attack pixels. Labels remain
