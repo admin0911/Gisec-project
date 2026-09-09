@@ -83,6 +83,20 @@ as embeddings. Look for weak shared residual or frequency signals across
 many samples and their association with the target label. Do not expect a
 single image or a single ResNet coordinate to reveal a 10% blend reliably.
 
+### Blended-injection detector checklist
+
+- [ ] Create branch `detector/blended-injection`
+- [ ] Begin with a 3% CIFAR-10 blended run, target `0`, `alpha=0.10`
+- [ ] Load matching `*-features.npz` and `*-images.npz` artifacts
+- [ ] Use pixels, embeddings, current labels, and stable sample IDs
+- [ ] Search for shared weak residual or frequency signals across samples
+- [ ] Return one finite suspicion score per sample
+- [ ] Preserve sample IDs and keep poison metadata out of scoring
+- [ ] Test clean data and 1%, 3%, 5%, and 10% blended runs
+- [ ] Add implementation under `detectors/` and tests under `tests/`
+- [ ] Run `python -m unittest discover -s tests -v`
+- [ ] Open a pull request into `main`
+
 ## Pull request checklist
 
 - [ ] New detector is in a new file under `detectors/`

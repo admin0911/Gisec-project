@@ -275,6 +275,29 @@ stored separately from both representations. For backdoor runs, the saved
 images include the white trigger patches; poison ground truth is available
 only on `features.is_poisoned`/`features.poison_type` for evaluation.
 
+### Developing a blended-injection detector
+
+The repository provides the blended-injection experiment and detector inputs;
+it does not claim to provide the final blended-attack detector. A teammate
+developing that detector should:
+
+1. Create a branch named `detector/blended-injection`.
+2. Start with a small CIFAR-10 run: 3% blended injection, target label `0`,
+   and `alpha=0.10`.
+3. Load the matching `*-features.npz` and `*-images.npz` artifacts.
+4. Use `pixels.images`, `features.scaled_features` or
+   `features.reduced_features`, `features.labels`, and `sample_ids`.
+5. Search for weak shared residual, color, or frequency-domain signals across
+   many samples and their association with the target label.
+6. Return one finite suspicion score per sample, with higher meaning more
+   suspicious, while preserving the original `sample_ids`.
+7. Test on clean data and on 1%, 3%, 5%, and 10% blended-injection runs.
+
+The detector must not use `is_poisoned`, `poison_type`, or `original_labels`
+while scoring. Those fields are evaluation-only ground truth. Add the detector
+under `detectors/`, add tests under `tests/`, run the full test command, and
+open a pull request into `main`.
+
 ## What do the extracted features mean?
 
 For images, a feature is a learned numeric measurement produced by the
