@@ -20,7 +20,7 @@ class ImageInputTests(unittest.TestCase):
         inputs = load_image_inputs(poisoned, limit=4)
         for index, is_poisoned in enumerate(poisoned.metadata.is_poisoned):
             expected = 1.0 if is_poisoned else 0.0
-            self.assertEqual(float(inputs.images[index, :, -1, -1]), expected)
+            self.assertEqual(float(inputs.images[index, :, -1, -1].max()), expected)
         self.assertEqual(inputs.images.shape, (4, 1, 8, 8))
 
 
