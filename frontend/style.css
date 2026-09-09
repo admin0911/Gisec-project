@@ -11,6 +11,7 @@ article p { color: #abb6c9; line-height: 1.5; }
 .status { color: #f2c879; letter-spacing: .04em; }
 .controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin: 2rem 0; }
 label { color: #abb6c9; display: grid; gap: .4rem; }
+label[hidden] { display: none; }
 select, input, button { border: 1px solid #53627d; border-radius: 8px; padding: .7rem; background: #171d29; color: #e9edf5; }
 button { cursor: pointer; color: #10131a; background: #72e6c2; font-weight: 700; }
 .result { border: 1px solid #34415a; border-radius: 16px; padding: 1rem; background: #171d29cc; }
