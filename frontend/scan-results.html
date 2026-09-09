@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PoisonGuard · Label-flip scan</title>
+  <!-- Leila: this theme belongs only to Scan results; main-page styles stay unchanged. -->
+  <link rel="stylesheet" href="/scan-results.css?v=review-summary">
+</head>
+<body><main class="scan-page">
+  <!-- Leila: compact navigation and a separate progress panel for the results view. -->
+  <nav aria-label="Page navigation"><a href="/">← Prepare dataset</a><span class="page-badge">LABEL-FLIP ANALYSIS</span></nav>
+  <p class="eyebrow">POISONGUARD / LABEL-FLIP SCAN</p>
+  <h1>Scan results</h1>
+  <p class="lede">Three checks on ResNet18 features. Three on DINOv2 features.</p>
+  <div class="scan-progress-panel">
+  <p id="scan-status" role="status" aria-live="polite">Loading scan…</p>
+  <progress id="scan-progress" value="0" max="100" aria-label="Scan progress"></progress>
+  <p class="help">Full scans can take several minutes. You can leave this page and return while the server is running.</p>
+  </div>
+  <section id="scan-result" hidden>
+    <p id="scan-summary"></p>
+    <div class="assessment-grid">
+      <!-- Leila: requested display labels; counts still represent detector assessments. -->
+      <article class="clean"><span>Clean</span><strong id="not-flagged"></strong><p>Not flagged by either encoder’s combined rule. This does not guarantee clean data.</p></article>
+      <!-- Leila: accessible card links open the corresponding human review group. -->
+      <article class="uncertain"><a id="review-uncertain" class="review-card" href="#"><span>Needs review</span><strong id="uncertain"></strong><p>The encoders disagree. Only one reaches two detector votes.</p></a></article>
+      <article class="suspected"><a id="review-suspected" class="review-card" href="#"><span>Poisoned data</span><strong id="suspected"></strong><p>Suspected poisoning, not confirmed. Both encoders reach at least two detector votes.</p></a></article>
+    </div>
+    <!-- Leila: review is optional and appears only once scan results are ready. -->
+    <p><a id="human-review" class="review-primary" href="#">Human review →</a></p>
+    <!-- Leila: show saved human choices below the review button, separate from detector counts. -->
+    <div class="human-review-summary" aria-live="polite">
+      <p id="review-saved-status" class="help">Loading saved review decisions…</p>
+      <div id="review-saved-counts" class="review-counts" hidden>
+        <span class="review-keep">Keep <b id="saved-keep">0</b></span>
+        <span class="review-quarantine">Quarantine <b id="saved-quarantine">0</b></span>
+        <span class="review-unsure">Unsure <b id="saved-unsure">0</b></span>
+      </div>
+    </div>
+    <!-- Leila: keep individual detector results collapsed until the user expands them. -->
+    <details><summary>More information · Individual detector results</summary>
+      <div class="table-scroll"><table><thead><tr><th>Features</th><th>Detector</th><th>Flagged</th><th>Rate</th><th>Score cutoff (strictly greater)</th></tr></thead><tbody id="detector-rows"></tbody></table></div>
+    </details>
+    <details><summary>More information · sample findings</summary>
+      <p class="help">Up to 24 flagged sample IDs in dataset order. All scores and decisions are saved in the results file.</p>
+      <div id="scan-examples"></div>
+    </details>
+    <details><summary>More information · thresholds and saved results</summary>
+      <p id="scan-profile"></p><p id="scan-limitation" class="help"></p><p id="scan-file" class="help"></p>
+    </details>
+    <!-- Leila: continue to training preparation after the completed scan and optional review. -->
+    <p style="margin-top:28px"><a id="prepare-training" class="review-primary" href="#">Prepare training dataset →</a></p>
+  </section>
+<!-- Leila: refresh the results controller to show current saved reviews after returning. -->
+</main><script src="/scan-results.js?v=training-preparation"></script></body></html>

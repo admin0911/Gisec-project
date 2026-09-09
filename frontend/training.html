@@ -1,0 +1,42 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoisonGuard · Training</title><link rel="stylesheet" href="/scan-results.css"><link rel="stylesheet" href="/training.css">
+</head><body><main class="scan-page">
+<nav><a id="back-results" href="/scan-results.html">← Scan results</a><span class="page-badge">TRAINING</span></nav>
+<h1>Prepare. Train. Compare.</h1>
+<p class="lede">Use your scan and saved review decisions to prepare the training data.</p>
+<p id="preparation-status" role="status">Preparing a new dataset version…</p>
+<section id="prepared" hidden>
+  <!-- Leila: group all excluded samples into one training summary card. -->
+  <div class="assessment-grid training-summary">
+    <article class="clean"><span>KEPT FOR TRAINING</span><strong id="kept"></strong><p>Unflagged samples and samples you chose to keep.</p></article>
+    <article class="suspected"><span>REMOVED FROM TRAINING</span><strong id="removed"></strong><p id="removed-breakdown"></p><p>Excluded from training. Original images remain saved.</p></article>
+  </div>
+  <!-- Leila: benchmark truth is displayed separately from scanner decisions. -->
+  <section class="training-controls" aria-labelledby="evaluation-title">
+    <h2 id="evaluation-title">Demo evaluation · actual clean and poisoned samples</h2>
+    <p class="help">Known from the demo attack metadata. Used only to evaluate the results, never to decide which samples to remove.</p>
+    <p id="evaluation-status" role="status">Loading known sample counts…</p>
+    <div id="evaluation-table" class="table-scroll" hidden><table><thead><tr><th>Data</th><th>Known clean</th><th>Known poisoned</th><th>Total</th></tr></thead><tbody id="evaluation-rows"></tbody></table></div>
+    <p id="evaluation-note" class="help"></p>
+  </section>
+  <section class="training-controls">
+    <h2>Train & compare</h2>
+    <!-- Leila: include a clean-data benchmark without using it to make cleaning decisions. -->
+    <p id="training-description" class="help">Compare clean reference and after cleaning. A before-cleaning model is also trained when the input differs from the clean reference. All use the same model, seed, epochs and separate CIFAR-10 test set.</p>
+    <label>Epochs per model <select id="epochs"><option value="1">1 · quick check</option><option value="5" selected>5</option><option value="10">10</option><option value="20">20</option></select></label>
+    <button id="train" type="button">Train & compare</button>
+    <p class="help">Uses the CPU and can take a while on the full dataset. Keep the server running.</p>
+  </section>
+</section>
+<p id="training-status" role="status" aria-live="polite"></p>
+<progress id="training-progress" value="0" max="100" aria-label="Training progress" hidden></progress>
+<section id="comparison" hidden>
+  <h2>Comparison results</h2>
+  <!-- Leila: accuracy is the main result; supporting details remain expandable. -->
+  <p class="help">Test accuracy measures correct predictions on the separate, clean CIFAR-10 test set.</p>
+  <div class="table-scroll"><table><thead><tr><th>Training data</th><th>Test accuracy</th></tr></thead><tbody id="comparison-rows"></tbody></table></div>
+  <p id="reference-status" class="help"></p>
+  <details><summary>More information · saved training results</summary><p id="accuracy-change"></p><p id="comparison-note" class="help"></p><p id="comparison-file" class="help"></p></details>
+</section>
+</main><script src="/training.js"></script></body></html>

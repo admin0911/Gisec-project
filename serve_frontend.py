@@ -19,6 +19,16 @@ from poison_features import (
 )
 from poison_features.attacks import poison_dataset, poison_texts
 
+# Leila: keep label-flip scanning in its own adapter alongside the extraction API.
+from label_flip_api import handle_scan_request
+
+# Leila: optional human review and reopening saved scan results after a restart.
+from review_api import handle_review_request
+from cleaning.human_review import restored_scan_job
+
+# Leila: keep preparation and training routes in a separate adapter.
+from training_api import handle_training_request
+
 JOBS: dict[str, dict] = {}
 JOBS_LOCK = threading.Lock()
 
@@ -36,6 +46,14 @@ class FeatureHandler(SimpleHTTPRequestHandler):
             job_id = self.path.rsplit("/", 1)[-1]
             with JOBS_LOCK:
                 job = JOBS.get(job_id)
+            # Leila: completed scans can be restored from disk without rerunning detectors.
+            if job is None:
+                try:
+                    job = restored_scan_job(job_id)
+                    with JOBS_LOCK:
+                        JOBS[job_id] = job
+                except (ValueError, OSError, KeyError, TypeError):
+                    pass
             if job is None:
                 self.send_error(404, "Unknown extraction job")
                 return
@@ -44,6 +62,15 @@ class FeatureHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        # Leila: preparation snapshots saved reviews; training runs only on explicit request.
+        if handle_training_request(self):
+            return
+        # Leila: save human decisions separately; extraction and scanning retain their routes.
+        if handle_review_request(self):
+            return
+        # Leila: handle scan requests first; existing extraction requests continue below.
+        if handle_scan_request(self, JOBS, JOBS_LOCK, update_job):
+            return
         if self.path != "/api/extract":
             self.send_error(404)
             return

@@ -34,6 +34,9 @@ $('extract').onclick = async () => {
   $('status').textContent = 'Starting extraction...';
   $('progress').hidden = false; $('progress-copy').hidden = false;
   $('extract').disabled = true;
+  // Leila: only enable scanning if the form still describes this completed extraction.
+  const scanSettings = () => JSON.stringify([...document.querySelectorAll('.controls input, .controls select')].map(control => control.value));
+  const extractionSettings = scanSettings();
   try {
     const response = await fetch('/api/extract', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -57,6 +60,10 @@ $('extract').onclick = async () => {
       : '';
     $('result').hidden = false; draw(data.visual_features, data.labels);
     $('status').textContent = data.poisoned === null ? 'Extraction complete' : `Extraction complete · ${data.poisoned} poisoned samples`;
+    // Leila: let the separate scan controller check for the matching second encoder.
+    if (scanSettings() === extractionSettings) {
+      document.dispatchEvent(new CustomEvent('features-ready', {detail: data}));
+    }
   } catch (error) { $('status').textContent = `Error: ${error.message}`; }
   finally { $('extract').disabled = false; }
 };
