@@ -7,6 +7,7 @@ are retained under `evidence` once the connector wraps the result.
 
 import numpy as np
 
+from detectors.blended_injection.background_lift import scan_background_lift
 from detectors.blended_injection.residual_signature import (
     BlendedInjectionDetector,
     flag_samples,
@@ -137,9 +138,19 @@ def scan_all_classes(pixels, min_contrast: float = _MIN_CONTRAST,
     ratio = (contrasts[suspect] / peer_median) if peer_median > 0 else float("inf")
 
     if contrasts[suspect] < min_contrast or ratio < min_class_ratio:
+        # No shared pattern stood out. That signature needs images to be
+        # individually distinctive, which holds for photographs but not for
+        # datasets whose classes look alike, so fall back to the background
+        # check - it asks a different question and covers exactly that case.
+        fallback = scan_background_lift(pixels)
+        if fallback["target_class"] is not None:
+            fallback["class_contrasts"] = contrasts
+            return fallback
+        nothing_found["method"] = "residual-signature"
         return nothing_found
 
     return {
+        "method": "residual-signature",
         "sample_ids": best["sample_ids"],
         "scores": best["scores"],
         "flags": flag_samples(best, labels, suspect),
