@@ -40,28 +40,28 @@ class PreparationTests(unittest.TestCase):
     def test_snapshot_policy_and_later_reviews(self):
         original = preparation.file_hash(self.source)
         prepared = preparation.prepare_dataset(self.job)
-        self.assertEqual(prepared['summary'],dict(kept=11,quarantined=5,unresolved=4,total=20))
+        self.assertEqual(prepared['summary'],dict(kept=11,quarantined=8,unresolved=1,total=20))
         manifest = preparation.load_preparation(prepared['version'])
         self.assertEqual(manifest['actions'][10:14],['keep','quarantine','human_review','quarantine'])
         self.assertEqual(manifest['reasons'][13],'scanner_suspected')
-        self.assertEqual(prepared['policy_version'],'3.0-hold-unresolved')
+        self.assertEqual(prepared['policy_version'],'4.0-quarantine-unreviewed')
         human_review.save_review(self.job,{self.ids[13]:'keep'},1)
         self.assertEqual(preparation.load_preparation(prepared['version'])['summary']['kept'],11)
         latest = preparation.prepare_dataset(self.job)
         self.assertNotEqual(latest['version'],prepared['version'])
         self.assertEqual(latest['summary']['kept'],12)
-        self.assertEqual(latest['summary']['quarantined'],4)
-        self.assertEqual(preparation.load_preparation(prepared['version'])['summary']['quarantined'],5)
+        self.assertEqual(latest['summary']['quarantined'],7)
+        self.assertEqual(preparation.load_preparation(prepared['version'])['summary']['quarantined'],8)
         self.assertEqual(preparation.file_hash(self.source),original)
 
     def test_no_reviews_quarantines_suspects_and_holds_uncertain(self):
         selection = preparation.merge_choices(self.assessment,{'decisions':{}})
-        self.assertEqual(selection['summary'],dict(kept=10,quarantined=5,unresolved=5,total=20))
+        self.assertEqual(selection['summary'],dict(kept=10,quarantined=10,unresolved=0,total=20))
 
     def test_human_unsure_overrides_suspect_and_legacy_policy_is_preserved(self):
         selection = preparation.merge_choices(self.assessment,{'decisions':{
             self.ids[11]:{'decision':'unsure'}, self.ids[13]:{'decision':'keep'}}})
-        self.assertEqual(selection['summary'],dict(kept=11,quarantined=3,unresolved=6,total=20))
+        self.assertEqual(selection['summary'],dict(kept=11,quarantined=8,unresolved=1,total=20))
         self.assertEqual(selection['reasons'][11],'human_unsure')
         data = preparation.prepare_dataset(self.job)
         del data['policy_version']
@@ -90,11 +90,12 @@ class PreparationTests(unittest.TestCase):
         self.assertEqual(report['status'],'complete')
         self.assertEqual(len(initial),3)
         self.assertTrue(all(torch.equal(initial[0],weights) for weights in initial[1:]))
-        self.assertEqual(report['runs']['clean_reference']['training_samples'],20)
-        self.assertEqual(report['runs']['before_cleaning']['training_samples'],20)
-        self.assertEqual(report['runs']['after_cleaning']['training_samples'],11)
+        self.assertEqual(report['runs']['clean_reference']['training_samples'],18)
+        self.assertEqual(report['runs']['before_cleaning']['training_samples'],18)
+        expected=[sid for sid in self.ids[:11] if sid not in report['validation']['sample_ids']]
+        self.assertEqual(report['runs']['after_cleaning']['training_samples'],len(expected))
         ids = np.load(report['runs']['after_cleaning']['artifacts']['training_ids'])
-        self.assertEqual(ids.tolist(),self.ids[:11])
+        self.assertEqual(ids.tolist(),expected)
         self.assertFalse(loader.call_args.kwargs['download'])
         self.assertFalse(loader.call_args.kwargs['train'])
         self.assertEqual(report['runs']['before_cleaning']['settings'],report['runs']['after_cleaning']['settings'])
@@ -107,7 +108,7 @@ class PreparationTests(unittest.TestCase):
         from types import SimpleNamespace
         ids = np.array(['cifar10-train:7','cifar10-train:2'],dtype='U40')
         manifest = dict(source_images=str(self.source),source_sha256=preparation.file_hash(self.source),
-            sample_ids=ids.tolist(),scan_id=self.job,review_revision=0,summary={},actions=['keep','quarantine'])
+            sample_ids=ids.tolist(),scan_id=self.job,review_revision=0,summary={},actions=['keep','keep'])
         bundle = SimpleNamespace(sample_ids=ids,images=self.images[:2],labels=np.array([9,9]))
         clean = TensorDataset(torch.from_numpy(self.images),torch.from_numpy(self.labels))
         seen = []
@@ -119,7 +120,10 @@ class PreparationTests(unittest.TestCase):
              patch.object(web_comparison,'load_image_dataset',return_value=clean), \
              patch.object(web_comparison,'train_classifier',side_effect=train):
             web_comparison.train_comparison('unused',1,self.root/'subset',lambda *args:None)
-            self.assertEqual(seen,[(ids.tolist(),[7,2]),(ids.tolist(),[9,9]),([ids[0]],[9])])
+            self.assertEqual(len(seen[0][0]),1)
+            self.assertEqual(seen[0][1],[int(seen[0][0][0].split(':')[1])])
+            self.assertEqual(seen[1],(seen[0][0],[9]))
+            self.assertEqual(seen[2],seen[1])
             ids[0]='cifar10-train:99'; manifest['sample_ids']=ids.tolist()
             with self.assertRaisesRegex(ValueError,'cannot be mapped'):
                 web_comparison.train_comparison('unused',1,self.root/'bad',lambda *args:None)
@@ -162,6 +166,32 @@ class PreparationTests(unittest.TestCase):
         saved = training_api.OUTPUT/job/'job.json'
         saved.write_text(json.dumps(dict(state,status='running')))
         self.assertIn('interrupted',training_api.get_job(job)['message'])
+
+
+    def test_ten_saved_keep_choices_reach_preparation_and_training(self):
+        from training.validation import validation_split
+        from training.connector import training_input
+        from cleaning.label_flip import partition_dataset
+        # Make all ten flagged rows excluded before explicit human overrides.
+        human_review.save_review(self.job,{sid:'quarantine' for sid in self.ids[10:]},1)
+        before=preparation.prepare_dataset(self.job)
+        human_review.save_review(self.job,{sid:'keep' for sid in self.ids[10:]},2)
+        after=preparation.prepare_dataset(self.job)
+        self.assertEqual(after['summary']['kept']-before['summary']['kept'],10)
+        self.assertEqual(after['summary']['quarantined'],0)
+        manifest=preparation.load_preparation(after['version'])
+        self.assertEqual(manifest['actions'],['keep']*20)
+        source=TensorDataset(torch.from_numpy(self.images),torch.from_numpy(self.labels))
+        kept=partition_dataset(source,np.array(self.ids),manifest)['keep']
+        ref=training_input(source,self.ids,dataset_version='reference',split='train')
+        arm=training_input(kept,kept.sample_ids,dataset_version='filtered',split='train')
+        validation,arms,_=validation_split(ref,[('filtered',arm)])
+        train_ids=set(arms[0][1].sample_ids.tolist());val_ids=set(validation.sample_ids.tolist())
+        self.assertFalse(train_ids & val_ids)
+        self.assertEqual(train_ids | val_ids,set(self.ids))
+        self.assertTrue(set(self.ids[10:]) <= train_ids | val_ids)
+        # Existing preparations retain their saved snapshot.
+        self.assertEqual(preparation.load_preparation(before['version'])['summary']['kept'],10)
 
 
 if __name__ == '__main__': unittest.main()

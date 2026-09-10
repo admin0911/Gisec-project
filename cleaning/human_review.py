@@ -137,13 +137,21 @@ def review_page(job_id, group='uncertain', page=0, page_size=20):
         bundle = FeatureBundle.load(text_feature_path(data))
         if bundle.sample_ids.tolist() != a['sample_ids']: raise ValueError('Text IDs differ from scan.')
         labels = bundle.labels
-        reviews_data = load_imdb_dataset(split='train',cache_dir=str(ARTIFACTS.parent/'data'))
-        from poison_features.imdb_identity import imdb_training_indices
-        indices = imdb_training_indices(bundle,text_feature_path(data),reviews_data)
-        thumbs = {}
-        for i in rows[page*page_size:(page+1)*page_size]:
-            sid=a['sample_ids'][i]
-            thumbs[sid]=reviews_data[int(indices[i])]['text']
+        # Leila: show submitted post-attack text, retaining legacy clean/label-flip fallback.
+        text_path=text_feature_path(data).with_name(text_feature_path(data).name.replace('-features.npz','-texts.jsonl'))
+        if text_path.exists():
+            from poison_features.text_inputs import TextInputBundle
+            text_inputs=TextInputBundle.load(text_path)
+            if not np.array_equal(text_inputs.sample_ids,bundle.sample_ids) or not np.array_equal(text_inputs.labels,labels): raise ValueError('Review text differs from features.')
+            texts=text_inputs.texts
+        else:
+            if '-backdoor-' in text_path.name: raise ValueError('Backdoor review text is missing; rebuild the dataset.')
+            reviews_data=load_imdb_dataset(split='train',cache_dir=str(ARTIFACTS.parent/'data'))
+            from poison_features.imdb_identity import imdb_training_indices
+            indices=imdb_training_indices(bundle,text_feature_path(data),reviews_data)
+            texts=[reviews_data[int(i)]['text'] for i in indices]
+        thumbs={a['sample_ids'][i]:texts[i] for i in rows[page*page_size:(page+1)*page_size]}
+
     else:
         pixels = image_path(data)
         stat = pixels.stat()
@@ -159,6 +167,9 @@ def review_page(job_id, group='uncertain', page=0, page_size=20):
             image=None if imdb else thumbs[sid],text=thumbs[sid] if imdb else None,text_votes=a['vote_counts']['minilm'][i] if imdb else None, resnet_votes=None if (mnist or imdb) else a['vote_counts']['resnet18'][i],
             dino_votes=None if (mnist or imdb) else a['vote_counts']['dinov2'][i],
             pixel_votes=a['vote_counts']['pixels'][i] if mnist else None, decision=saved['decisions'].get(str(sid), {}).get('decision'),
+            phrase_flagged=bool(data.get('phrase_scan',{}).get('flags',[False]*len(a['sample_ids']))[i]),
+            # Leila: show why a sample entered the combined review queue.
+            blended_flagged=bool(data.get('blended_scan',{}).get('flags',[False]*len(a['sample_ids']))[i]),
             patch_flagged=bool(data.get('patch_scan',{}).get('flags',[False]*len(a['sample_ids']))[i]),
             assessment=a['assessment'][i]))
     decisions = [saved['decisions'].get(str(a['sample_ids'][i]), {}).get('decision') for i in rows]

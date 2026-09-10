@@ -4,49 +4,59 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Gisec PoisonGuard · Feature Layer</title>
+    <title>PoisonGuard · Prepare dataset</title>
     <link rel="stylesheet" href="/style.css">
     <!-- Leila: styles for the added scan controls and results page. -->
     <link rel="stylesheet" href="/label-flip.css">
+    <!-- Leila: first-page presentation and the selected dataset-scan logo. -->
+    <link rel="stylesheet" href="/home.css?v=1">
+    <link rel="icon" type="image/svg+xml" href="/poisonguard-logo.svg">
   </head>
-  <body>
+  <body class="home-page">
     <main>
-      <p class="eyebrow">GISEC PROJECT / POISONGUARD</p>
-      <h1>Universal feature layer</h1>
-      <p class="lede">Extract detector-ready representations from real datasets and inspect their 2D structure.</p>
+      <!-- Leila: compact branding replaces the feature-layer introduction. -->
+      <header class="home-header"><a class="brand" href="/" aria-label="PoisonGuard home"><img src="/poisonguard-logo.svg" alt="" width="52" height="52"><span>PoisonGuard</span></a><span class="project-label">GISEC PROJECT</span></header>
+      <div class="home-intro"><p class="eyebrow">DATASET SECURITY</p><h1>Prepare your dataset</h1><p class="lede">Build a demo dataset, scan for suspicious samples, and review the findings.</p></div>
+      <!-- Leila: group existing controls without changing their IDs or behaviour. -->
       <section class="controls">
+        <div class="control-group"><h2><span class="step">1</span> Choose dataset</h2><div class="field-row">
         <label>Dataset <select id="dataset"><option value="cifar10">CIFAR-10</option><option value="mnist">MNIST</option><option value="imdb">IMDB text</option></select></label>
         <label id="encoder-control">Image features
           <select id="encoder"><option value="resnet18">ResNet-18 (512D)</option><option value="dinov2">DINOv2 ViT-S/14 (384D)</option></select>
         </label>
-        <label>Extraction scope
+        <label>Dataset size
           <select id="scope">
             <option value="sample">Quick sample</option>
-            <option value="full">Whole training split</option>
+            <option value="full">Full training dataset</option>
           </select>
         </label>
         <label id="sample-control">Sample count
           <input id="limit" type="number" value="100" min="21" max="50000">
         </label>
+        </div></div>
+        <div class="control-group"><h2><span class="step">2</span> Choose demo attack</h2><div class="field-row">
         <label>Attack <select id="attack"><option value="none">Clean</option><option value="label_flip">Random label flip</option><option value="targeted_label_flip">Targeted label flip</option><option value="backdoor">Backdoor patch</option><option value="blended_injection">Blended noise injection</option></select></label>
         <label id="source-control" hidden>Source label <input id="source-label" type="number" value="1" min="0" max="9"></label>
         <label id="target-control" hidden>Target label <input id="target-label" type="number" value="0" min="0" max="9"></label>
         <label id="alpha-control" hidden>Blend alpha <input id="blend-alpha" type="number" value="0.10" min="0.01" max="1" step="0.01"></label>
         <!-- Leila: 7% is available for label-flip and backdoor dataset builds. -->
         <label>Poison rate <select id="poison-rate"><option value="0.01">1%</option><option value="0.03">3%</option><option value="0.05" selected>5%</option><option id="rate-seven" value="0.07" hidden disabled>7%</option><option value="0.10">10%</option></select></label>
+        </div></div>
+        <div class="build-action">
         <!-- Leila: use Build dataset as the user-facing label for the existing action. -->
-        <button id="extract">Build dataset</button>
+        <button id="extract">Build dataset</button></div>
       </section>
-      <p id="status" class="status">Ready</p>
+      <p id="status" class="status" aria-live="polite"></p>
       <progress id="progress" value="0" max="100" hidden></progress>
       <p id="progress-copy" class="progress-copy" hidden></p>
       <!-- Leila: scan becomes available after both matching image encoders finish. -->
-      <section id="label-flip-controls" class="scan-controls" aria-label="Label-flip scanning">
+      <section id="label-flip-controls" class="scan-controls" aria-label="Dataset scanning">
+        <h2><span class="step">3</span> Scan dataset</h2>
         <!-- Leila: choose existing feature pairs without repeating extraction. -->
-        <label>Saved features for scanning
-          <select id="saved-scan-features"><option value="">Loading saved features…</option></select>
+        <label>Saved dataset
+          <select id="saved-scan-features"><option value="">Loading saved datasets…</option></select>
         </label>
-        <button id="scan-label-flips" disabled>Scan label flips</button>
+        <button id="scan-label-flips" disabled>Scan dataset →</button>
         <p id="scan-readiness" class="help" aria-live="polite">Build at least 21 balanced samples, or select a saved extraction, to enable scanning.</p>
         <a id="last-scan" href="/scan" hidden>View unified results</a>
       </section>
@@ -72,26 +82,21 @@
       </section>
       <section id="result" class="result" hidden>
         <strong id="summary"></strong>
-        <p id="artifacts" class="help"></p>
-        <canvas id="plot" width="720" height="360"></canvas>
+        <!-- Leila: preserve optional build diagnostics in a collapsed disclosure. -->
+        <details><summary>Dataset details and preview</summary><p id="artifacts" class="help"></p>
+        <canvas id="plot" width="720" height="360"></canvas></details>
       </section>
+      <!-- Leila: describe the user journey instead of implementation details. -->
       <section class="pipeline">
         <p class="eyebrow">HOW IT WORKS</p>
-        <div class="diagram"><span>Dataset</span><b>→</b><span>Modality adapter</span><b>→</b><span>Encoder</span><b>→</b><span>FeatureBundle</span><b>→</b><span>Detectors</span></div>
-        <p class="help">Images use ResNet-18, text uses MiniLM, and structured network flows use engineered numeric fields. All adapters return the same detector-facing bundle.</p>
+        <div class="diagram"><span>Build dataset</span><b>→</b><span>Scan</span><b>→</b><span>Optional human review</span><b>→</b><span>Prepare training data</span><b>→</b><span>Train &amp; compare</span></div>
       </section>
-      <section class="grid">
-        <article><span>IMAGE</span><strong>ResNet-18</strong><p>512-dimensional frozen embeddings, with CPU and CUDA support.</p></article>
-        <article><span>PIPELINE</span><strong>FeatureBundle</strong><p>Raw, standardized, and PCA-reduced representations keep labels separate.</p></article>
-        <article><span>INTEGRATION</span><strong>Merge-ready</strong><p>Stable sample IDs preserve the mapping back to every source row.</p></article>
-      </section>
-      <p class="status">Feature layer ready · connect your detector through the documented adapters</p>
     </main>
     <!-- Leila: refresh build controls so settings stay locked during extraction. -->
     <!-- Leila: temporarily bypass MNIST encoding at build time. -->
-    <script src="/app.js?v=attack-workflow-v1"></script>
+    <script src="/app.js?v=all-attack-scan-v2"></script>
     <!-- Leila: separate scan controller listens for completed feature extractions. -->
-    <script src="/label-flip.js?v=attack-workflow-v1"></script>
-    <script src="/blended-detector.js?v=1"></script>
+    <script src="/label-flip.js?v=dataset-descriptions-v1"></script>
+    <!-- Leila: noise runs after patches through Scan dataset, without a duplicate automatic scan. -->
   </body>
 </html>

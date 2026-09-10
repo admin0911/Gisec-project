@@ -5,6 +5,33 @@
   const message = document.getElementById('scan-readiness');
   const previous = document.getElementById('last-scan');
   const saved = document.getElementById('saved-scan-features');
+  // Leila: readable descriptions only; option values retain the exact saved paths.
+  function datasetLabel(file) {
+    const name = String(file).split(/[\\/]/).pop();
+    const header = name.match(/^(cifar10|mnist|imdb)-(train|test)-([^-]+)-/);
+    if (!header) return 'Saved dataset · details unavailable';
+    const dataset = {cifar10:'CIFAR-10',mnist:'MNIST',imdb:'IMDB'}[header[1]];
+    const size = header[3] === 'full' ? `Full ${header[2] === 'train' ? 'training' : 'test'} dataset` : `${Number(header[3]).toLocaleString()} ${header[1] === 'imdb' ? 'reviews' : 'images'}`;
+    const attack = name.match(/-(targeted_label_flip|label_flip|blended_injection|backdoor|none)-/);
+    const kind = attack?.[1];
+    const attacks = {none:'Clean',label_flip:'Random label flip',targeted_label_flip:'Targeted label flip',backdoor:header[1] === 'imdb'?'Backdoor phrase':'Backdoor patch',blended_injection:'Blended noise'};
+    const parts = [dataset, attacks[kind] || 'Attack unspecified'];
+    const count = name.match(/-n(\d+)-/);
+    const rate = name.match(/-(\d{3})-seed/);
+    if (kind && kind !== 'none') {
+      if (count) parts.push(`${Number(count[1]).toLocaleString()} poisoned samples`);
+      else if (rate) parts.push(`${Number(rate[1])}% poisoning`);
+    }
+    parts.push(size);
+    const source = name.match(/-s(\d+)-/), target = name.match(/-t(\d+)-/);
+    if (kind === 'targeted_label_flip' && source && target) parts.push(`Label ${source[1]} → ${target[1]}`);
+    else if (['backdoor','blended_injection'].includes(kind) && target) parts.push(`Target ${target[1]}`);
+    const alpha = name.match(/-a([\d.]+)-/);
+    if (kind === 'blended_injection' && alpha) parts.push(`Blend ${Number(alpha[1])}`);
+    const seed = name.match(/-seed(\d+)/);
+    if (seed) parts.push(`Seed ${seed[1]}`);
+    return parts.join(' · ');
+  }
   let featureFile = null, generation = 0;
   const last = sessionStorage.getItem('label-flip-job');
   if (last) {
@@ -51,12 +78,12 @@
       // Leila: show saved inputs for the selected dataset, including MNIST image connectors.
       const dataset = document.getElementById('dataset').value;
       data.pairs = data.pairs.filter(pair => pair.label.startsWith(dataset + '-'));
-      saved.replaceChildren(new Option('Choose saved features…', ''));
-      for (const pair of data.pairs) saved.add(new Option(pair.label, pair.feature_file));
+      saved.replaceChildren(new Option('Choose saved dataset…', ''));
+      for (const pair of data.pairs) saved.add(new Option(datasetLabel(pair.feature_file), pair.feature_file));
       const match = data.pairs.find(pair => pair.feature_file === preferred);
       const selected = match?.feature_file || preferred || (autoSelect ? data.pairs[0]?.feature_file : null);
       if (selected && ![...saved.options].some(option => option.value === selected)) {
-        saved.add(new Option('Just extracted features', selected));
+        saved.add(new Option(datasetLabel(selected), selected));
       }
       saved.value = selected || '';
       if (selected) await check(selected);
@@ -69,7 +96,7 @@
     const feature = event.detail.feature_file;
     if (!feature) { reset(); return; }
     if (![...saved.options].some(option => option.value === feature)) {
-      saved.add(new Option('Just built dataset',feature));
+      saved.add(new Option(datasetLabel(feature),feature));
     }
     saved.value = feature;
     check(feature);

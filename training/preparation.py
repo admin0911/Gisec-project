@@ -63,7 +63,7 @@ def prepare_dataset(scan_id):
     manifest = dict(schema_version='1.0',version=version,scan_id=scan_id,scan_sha256=digest,
         created_at=datetime.now(timezone.utc).isoformat(),dataset=dataset,source_images=str(source),
         source_sha256=original_hash,review_revision=reviews['revision'],review_snapshot=reviews['decisions'],
-        policy_version='3.0-hold-unresolved',
+        policy_version='4.0-quarantine-unreviewed',
         policy='human_choices_override; keep_unflagged; quarantine_suspected; hold_uncertain_or_unsure',
         class_counts=np.bincount(labels[kept].astype(int),minlength=2 if dataset=='imdb' else 10).tolist(),**selection)
     out = PREPARATIONS/version
@@ -86,6 +86,11 @@ def load_preparation(version):
 
 
 def preparation_summary(data):
+    # Leila: identify the saved build for chart filenames; unknown legacy builds stay unknown.
+    from dataset_info import describe_dataset
+    info = describe_dataset(data.get('source_images',''), data['summary']['total'])
+    source_name = Path(data.get('source_images','')).name
+    attack = next((kind for kind in ('label_flip','backdoor','blended','none') if f'-{kind}-' in source_name), 'unknown')
     # Leila: expose the frozen policy so older training runs keep accurate captions.
     return dict({key:data[key] for key in ('version','scan_id','created_at','dataset','summary','review_revision','class_counts')},
-                policy_version=data.get('policy_version','1.0'))
+                policy_version=data.get('policy_version','1.0'), attack=info['attack'] if 'attack' in info else attack, dataset_info=info)

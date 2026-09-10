@@ -13,7 +13,7 @@ class MNISTTrainingTests(unittest.TestCase):
     def test_two_of_three_selection(self):
         a=dict(sample_ids=['a','b','c'],assessment=['not_flagged','uncertain','suspected_label_flip'])
         self.assertEqual(merge_choices(a,{'decisions':{}},keep_uncertain=True)['actions'],['keep','keep','quarantine'])
-        self.assertEqual(merge_choices(a,{'decisions':{}},keep_uncertain=False)['actions'],['keep','human_review','quarantine'])
+        self.assertEqual(merge_choices(a,{'decisions':{}},keep_uncertain=False)['actions'],['keep','quarantine','quarantine'])
 
     def test_actual_three_arm_grayscale_training(self):
         torch.set_num_threads(2)
@@ -32,5 +32,5 @@ class MNISTTrainingTests(unittest.TestCase):
             with patch.object(web,'ARTIFACTS',root),patch.object(web,'load_preparation',return_value=manifest),patch.object(web,'load_image_dataset',side_effect=load):
                 result=web.train_comparison('test',1,root/'output',lambda *args:None)
             self.assertEqual(result['status'],'complete')
-            self.assertEqual([r['training_samples'] for r in result['runs'].values()],[10,10,9])
+            self.assertEqual([r['training_samples'] for r in result['runs'].values()],[9,9,8])
             self.assertEqual(result['dataset'],'mnist')

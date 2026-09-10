@@ -40,8 +40,9 @@
     const imdb = data.dataset === 'imdb';
     const single = mnist || imdb;
 
-    get('scan-description').textContent = imdb ? 'Three label-flip checks on MiniLM review features.' : mnist ? 'Three label-flip checks on original MNIST pixels.' : 'Three checks on ResNet18 features. Three on DINOv2 features.';
-    get('clean-explanation').textContent = single ? 'No detector flagged these images. This does not guarantee clean data.' : 'Not flagged by either encoder’s combined rule. This does not guarantee clean data.';
+    // Leila: describe the available scan stages without encoder implementation details.
+    get('scan-description').textContent = imdb ? 'Scanning for label flipping in review text.' : 'Scanning for label flipping, suspicious patches and blended noise.';
+    get('clean-explanation').textContent = single ? `No detector flagged these ${imdb ? 'reviews' : 'images'}. This does not guarantee clean data.` : 'Not flagged by either encoder’s combined rule. This does not guarantee clean data.';
     get('uncertain-explanation').textContent = single ? 'One of the three detectors flagged these samples.' : 'The encoders disagree. Only one reaches two detector votes.';
     get('suspected-explanation').textContent = single ? 'At least two of three detectors flagged these samples. Suspected, not confirmed.' : 'Suspected poisoning, not confirmed. Both encoders reach at least two detector votes.';
     // Leila: MNIST opens the shared preparation design with training disabled.
@@ -84,6 +85,30 @@
     }
     if (!data.examples.length) get('scan-examples').textContent = 'No samples reached the combined review rule.';
     // Leila: patch evidence is not a fourth vote in the label-flip assessment.
+    // Leila: always show the noise stage, including missing historical results and text applicability.
+    if (get('blended-results')) {
+      const blend=data.blended_scan;
+      get('blended-results').hidden=false;
+      get('blended-counts').hidden=!blend || !blend.applicable;
+      get('blended-status').hidden=false;
+      get('blended-status').textContent=imdb ? 'Not applicable: image-noise detection requires pixels. IMDB uses label and repeated-phrase checks.' : 'Not run in this saved scan. Run Scan dataset again to include noise detection.';
+      // Leila: the moved details are independent of the findings section.
+      if (get('blended-details')) get('blended-details').hidden=!blend;
+      get('blended-availability').textContent=blend?'Stage 3 · Blended-injection checks: '+(blend.applicable?'Completed':'Inconclusive'):'Blended-injection check not run for this saved scan.';
+      if(blend) {
+        get('blended-counts').hidden=!blend.applicable;
+        // Leila: only show the status paragraph when this check is inconclusive.
+        // Leila: completed checks are represented by the result cards alone.
+        get('blended-status').hidden=blend.applicable;
+        get('blended-status').textContent=blend.applicable?'':(blend.status || 'This check could not assess this input.');
+        get('blended-not-flagged').textContent=number(data.samples-blend.flagged);
+        get('blended-flagged').textContent=number(blend.flagged);
+        get('review-blended').href=`${reviewUrl}&group=uncertain`;
+        get('blended-settings').textContent=`Method: ${blend.method || "legacy consensus pixels"}. Scores indicate suspicion, not poisoning probability. Settings: ${JSON.stringify(blend.settings)}. Evidence: ${JSON.stringify(blend.evidence || {})}`;
+        get('blended-examples').replaceChildren();
+        for(const sample of blend.examples) {const p=document.createElement('p');p.textContent=`${sample.sample_id} · label ${sample.label} · score ${sample.score.toFixed(3)}`;get('blended-examples').appendChild(p);}
+      }
+    }
     const patch = data.patch_scan;
     get('patch-results').hidden = !patch;
     // Leila: the relocated details remain hidden for text and older scans without patches.
@@ -106,6 +131,28 @@
     }
     get('scan-result').hidden = false;
     loadReviewSummary();
+    // Leila: phrase flags request review; no automatic confirmed-poison verdict.
+    if (get('phrase-results')) {
+      get('phrase-results').hidden = !data.phrase_scan;
+      get('phrase-details').hidden = !data.phrase_scan;
+      if (data.phrase_scan) {
+        get('scan-description').textContent='Scanning for label flipping and suspicious repeated phrases.';
+        // Leila: use the same counts and review navigation as image backdoor cards.
+        get('phrase-not-flagged').textContent=number(data.samples-data.phrase_scan.flagged);
+        get('phrase-needs-review').textContent=number(data.phrase_scan.flagged);
+        get('review-phrases').href=`${reviewUrl}&group=uncertain`;
+        get('phrase-patterns').textContent='';
+        for (const pattern of data.phrase_scan.patterns) {
+          const p=document.createElement('p');p.textContent=`“${pattern.phrase}” · ${number(pattern.support)} matches · ${(pattern.purity*100).toFixed(1)}% label agreement`;
+          get('phrase-patterns').appendChild(p);
+        }
+      }
+    }
+    if (data.training_enabled === false && !imdb) {
+      get('prepare-training').removeAttribute('href');
+      get('prepare-training').textContent='Training integration pending';
+      get('prepare-training').setAttribute('aria-disabled','true');
+    }
     if (imdb) {
 
       const e=data.demo_evaluation, pct=v=>v==null?'N/A':`${(v*100).toFixed(2)}%`;
@@ -203,6 +250,9 @@
       const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
       if (!response.ok) throw new Error('Scan unavailable. The server may have restarted; start a new scan from Prepare dataset.');
       const job = await response.json();
+      // Leila: show the selected dataset for both active and restored scans.
+      const info = job.result?.dataset_info || job.dataset_info;
+      if (info && get('dataset-information')) { get('dataset-information').hidden=false; get('dataset-information-text').textContent=info.description; }
       get('scan-status').textContent = job.message;
       get('scan-progress').value = job.progress;
       if (job.status === 'error') throw new Error(job.message);

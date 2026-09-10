@@ -75,6 +75,16 @@ class FeatureHandler(SimpleHTTPRequestHandler):
             if job is None:
                 self.send_error(404, "Unknown extraction job")
                 return
+            # Leila: attach display metadata to old and new scans without changing saved results.
+            if job.get('status') == 'complete':
+                try:
+                    from cleaning.human_review import record
+                    from dataset_info import describe_dataset
+                    _, scan_record, _ = record(job_id)
+                    info = describe_dataset(scan_record['feature_files'][0], job.get('result', {}).get('samples'))
+                    job = dict(job, result=dict(job['result'], dataset_info=info))
+                except (ValueError, OSError, KeyError, TypeError):
+                    pass
             self._json(job)
             return
         super().do_GET()
@@ -289,9 +299,15 @@ def run_extraction(job_id: str, request: dict) -> None:
         )
         update_job(job_id, status="running", progress=2, message="Loading dataset")
         if name == "imdb":
+           # Leila: allow clean, label-flip, and backdoor scenarios for IMDB.
+            if attack not in ("none", "label_flip", "backdoor"):
+                raise ValueError("IMDB supports clean, label flip, or backdoor in this flow.")
             stem = f"{name}-{split}-{size_key}-minilm-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
+            # Leila: version phrase builds separately; use the verified neutral prefix and positive target.
+            if attack == "backdoor": stem += "-phrase-v1-positive-start"
             feature_path = artifacts / f"{stem}-features.npz"
-            if feature_path.exists():
+            text_path = artifacts / f"{stem}-texts.jsonl"
+            if feature_path.exists() and text_path.exists():
                 bundle = FeatureBundle.load(feature_path)
                 update_job(
                     job_id,
@@ -310,12 +326,21 @@ def run_extraction(job_id: str, request: dict) -> None:
             labels = [data[int(i)]["label"] for i in indices]
             metadata = {}
             if attack != "none":
+                # Leila: pass the target once, preserving the IMDB backdoor target.
                 texts, labels, metadata = poison_texts(
                     texts, labels, attack=attack,
                     poison_rate=poison_rate,
                     source_label=source_label,
-                    target_label=target_label,
+                    target_label=1 if attack == "backdoor" else target_label,
                     seed=int(request.get("seed", 0)),
+                    **(
+                        dict(
+                            trigger="silver lantern",
+                            trigger_position="start",
+                            selection_policy="non_target",
+                        )
+                        if attack == "backdoor" else {}
+                    ),
                 )
             update_job(job_id, progress=15, message=f"Encoding {total:,} reviews with MiniLM")
             bundle = extract_text(
@@ -324,6 +349,9 @@ def run_extraction(job_id: str, request: dict) -> None:
                 is_poisoned=metadata.get("is_poisoned", np.zeros(total,dtype=bool)),
                 poison_type=metadata.get("poison_type"),
             )
+            # Leila: preserve post-attack text through the raw-text connector, without truth.
+            from poison_features.text_inputs import TextInputBundle
+            TextInputBundle(tuple(texts),np.asarray(labels),bundle.sample_ids).save(text_path)
             bundle.save(feature_path)
             update_job(job_id, progress=95, message="Preparing PCA visualization")
             result = bundle_result(bundle, feature_path, None)

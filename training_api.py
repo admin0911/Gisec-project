@@ -41,11 +41,18 @@ def get_job(job_id):
     return saved
 
 
-def start_training(version,epochs):
+def start_training(version,epochs,mode="quick"):
+    # Leila: validate the benchmark option before starting any background work.
+    if mode not in ("quick","benchmark"): raise ValueError("Invalid training mode")
     validate_epochs(epochs)
     load_preparation(version)
     if not RUN_LOCK.acquire(blocking=False):
-        raise ValueError('A training comparison is already running. Wait for it to finish.')
+        # Leila: let the page follow the existing run instead of hiding its progress.
+        with JOBS_LOCK:
+            running = next((dict(job) for job in JOBS.values() if job['status'] in ('queued', 'running')), None)
+        if running is not None:
+            return dict(job_id=running['job_id'], version=running['version'], status=running['status'], already_running=True)
+        raise ValueError('Training is finishing. Please try again in a moment.')
     job_id = uuid.uuid4().hex
     with JOBS_LOCK:
         JOBS[job_id] = dict(job_id=job_id,version=version,status='queued',progress=0,message='Training queued')
@@ -53,7 +60,11 @@ def start_training(version,epochs):
         try:
             import torch
             torch.set_num_threads(4)
-            result = train_comparison(version,epochs,OUTPUT/job_id,
+            runner = train_comparison
+            if mode == "benchmark":
+                from training.benchmark import train_benchmark
+                runner = train_benchmark
+            result = runner(version,epochs,OUTPUT/job_id,
                 lambda value,message:_update(job_id,status='running',progress=value,message=message))
             _update(job_id,status='complete',progress=100,message='Training comparison complete',result=result)
         except Exception as exc:
@@ -79,7 +90,7 @@ def handle_training_request(handler):
         elif handler.path.endswith('/evaluation'):
             result = evaluate_prepared(request.get('version'))
         elif handler.path.endswith('/start'):
-            result = start_training(request.get('version'),request.get('epochs',5))
+            result = start_training(request.get('version'),request.get('epochs',5),request.get('mode','quick'))
             handler._json(result,status=202)
             return True
         else:

@@ -1,0 +1,33 @@
+/* Leila: scoped first-page layout; retain the original background and palette. */
+.home-page main { max-width: 1100px; padding: 32px 5vw 48px; }
+.home-header { display:flex; align-items:center; justify-content:space-between; padding-bottom:24px; border-bottom:1px solid #34415a; gap:20px; }
+.brand { display:inline-flex; align-items:center; gap:12px; color:#e9edf5; text-decoration:none; font-size:1.65rem; font-weight:700; letter-spacing:-.04em; }
+.brand img { flex-shrink:0; }
+.project-label { font-size:.7rem; letter-spacing:.16em; color:#abb6c9; }
+.home-intro { margin:38px 0 28px; }
+.home-page h1 { font-size:clamp(2rem,4vw,3.25rem); line-height:1.12; max-width:none; letter-spacing:-.035em; margin:12px 0; }
+.home-page .lede { max-width:760px; font-size:1.05rem; line-height:1.6; margin:0; }
+.home-page .controls { display:block; margin:0; border:1px solid #34415a; border-radius:16px; background:#171d29cc; overflow:hidden; }
+.control-group { padding:24px; }
+.control-group + .control-group { border-top:1px solid #34415a; }
+.home-page h2 { font-size:1rem; margin:0 0 20px; font-weight:600; display:flex; align-items:center; gap:10px; }
+.step { display:inline-flex; justify-content:center; align-items:center; width:26px; height:26px; border-radius:50%; background:#72e6c218; color:#72e6c2; font-size:.8rem; }
+.field-row { display:flex; flex-wrap:wrap; gap:18px; align-items:end; }
+.field-row label { flex:1 1 145px; font-size:.85rem; gap:8px; }
+.field-row label[hidden] { display:none; }
+.field-row select,.field-row input { width:100%; box-sizing:border-box; min-height:44px; }
+.field-row #source-control,.field-row #target-control,.field-row #alpha-control { flex:0 1 120px; }
+.build-action { padding:0 24px 24px; }
+.home-page button { padding:12px 23px; min-height:44px; border-color:transparent; }
+.home-page button:not(:disabled):hover { filter:brightness(1.08); }
+.home-page :is(button,select,input,a,summary):focus-visible { outline:2px solid #f2c879; outline-offset:4px; }
+.home-page .status:empty { display:none; }
+.home-page .scan-controls { padding:24px; margin:22px 0; }
+.home-page .scan-controls label { max-width:100%; font-size:.85rem; }
+.home-page .scan-controls .help { font-size:.85rem; margin-bottom:0; }
+.home-page .pipeline { margin-top:28px; padding:20px 24px; background:transparent; }
+.home-page .diagram { font-size:.85rem; line-height:1.8; gap:10px; }
+.home-page .diagram span { color:#abb6c9; font-weight:500; }
+.home-page details { margin-top:12px; }
+.home-page #artifacts { overflow-wrap:anywhere; }
+@media(max-width:600px) { .home-page main { padding:22px 5vw; } .project-label { display:none; } .control-group,.home-page .scan-controls { padding:18px; } .field-row label { flex-basis:100%; } .field-row #source-control,.field-row #target-control,.field-row #alpha-control { flex:1 1 90px; } .build-action { padding:0 18px 18px; } .home-page .build-action button { width:100%; } }

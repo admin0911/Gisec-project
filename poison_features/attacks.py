@@ -163,6 +163,10 @@ def poison_texts(
     source_label: int | None = None,
     target_label: int = 1,
     trigger: str = "excellent cinematic signal",
+    # Leila: allow a visible prefix before text encoders truncate long reviews.
+    trigger_position: str = "end",
+    # Leila: opt-in non-target sampling preserves existing shared callers.
+    selection_policy: str = "all",
     seed: int = 0,
 ) -> tuple[list[str], np.ndarray, dict[str, np.ndarray]]:
     """Apply label-flip or phrase-trigger poisoning to text rows."""
@@ -175,15 +179,33 @@ def poison_texts(
             raise ValueError("source_label and target_label must differ")
     if not 0 <= poison_rate <= 1:
         raise ValueError("poison_rate must be between 0 and 1")
+    # Leila: validate text alignment and phrase settings before applying an attack.
+    if len(texts) != len(labels) or not all(isinstance(t, str) for t in texts):
+        raise ValueError("Expected aligned text rows and labels")
+    if trigger_position not in {"start", "end"} or not isinstance(trigger, str) or not trigger.strip():
+        raise ValueError("Expected a nonempty trigger and start/end position")
     original = np.asarray(labels, dtype=np.int64)
+    if original.ndim != 1 or not np.isin(original, [0, 1]).all() or target_label not in (0, 1):
+        raise ValueError("Text attack requires binary sentiment labels")
     rng = np.random.default_rng(seed)
     count = int(round(len(original) * poison_rate))
-    candidates = np.arange(len(original))
+       # Leila: preserve targeted flips and non-target backdoor sampling.
+    if selection_policy not in {"all", "non_target"}:
+        raise ValueError("selection_policy must be all or non_target")
+    if selection_policy == "non_target" and attack != "backdoor":
+        raise ValueError("non_target selection is only supported for backdoor attacks")
+
     if attack == "targeted_label_flip":
-        candidates = candidates[original == source_label]
-        if count > len(candidates):
-            raise ValueError("poison_rate selects more rows than the source class contains")
-    selected = np.sort(rng.choice(candidates, size=count, replace=False))
+        eligible = np.flatnonzero(original == source_label)
+    elif selection_policy == "non_target":
+        eligible = np.flatnonzero(original != target_label)
+    else:
+        eligible = np.arange(len(original))
+
+    if count > len(eligible):
+        raise ValueError("Not enough eligible reviews for the requested poison rate")
+
+    selected = np.sort(rng.choice(eligible, size=count, replace=False))
     poisoned = np.zeros(len(original), dtype=bool)
     poisoned[selected] = True
     current = original.copy()
@@ -195,7 +217,8 @@ def poison_texts(
     else:
         current[poisoned] = target_label
         result_texts = [
-            f"{text} {trigger}" if poisoned[index] else text
+            (f"{trigger} {text}" if trigger_position == "start" else f"{text} {trigger}")
+            if poisoned[index] else text
             for index, text in enumerate(result_texts)
         ]
     return result_texts, current, {

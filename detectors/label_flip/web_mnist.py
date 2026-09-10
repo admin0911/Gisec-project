@@ -36,11 +36,15 @@ def run(feature_path, output_dir, progress):
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=False)
     step = 0
+    detector_name = "Starting"
     def report(message):
-        nonlocal step
+        nonlocal step, detector_name
         if ' of 3:' in message:
-            step = int(message.split(' of 3:', 1)[0])
-        progress(step * 2, message)
+            local_step, detector_name = message.split(' of 3:', 1)
+            step = int(local_step)
+            message = ''
+        # Leila: fold progress belongs inside the current label detector.
+        progress(step * 2, f'Stage 1 of 3 · Label-flip checks\nCheck {step} of 3 · {detector_name.strip()} — MNIST pixels' + (f'\n{message.strip()}' if message.strip() else ''))
     with threadpool_limits(limits=4):
         # Leila: apply the same threshold recorded in the scan/cache profile.
         results, timings = scan_pixels(inputs, knn_threshold=config['knn_threshold'], progress=report)
@@ -54,6 +58,9 @@ def run(feature_path, output_dir, progress):
     # Leila: scan the same original pixels after label checks, without changing label votes.
     from detectors.backdoor.web_patch import scan_patch
     patch_result, patch_ui = scan_patch(images, assessment, progress)
+    # Leila: use the same teammate noise connector as CIFAR after patch scanning.
+    from detectors.blended_injection.web_noise import scan_noise
+    blended_result, blended_ui = scan_noise(images, progress)
     rows = []
     for name, result in results.items():
         cutoff = '≥ 0.95 (19/20)' if name == 'knn' else '≥ 0.10' if name == 'class_distance' else 'Cleanlab pruning'
@@ -64,13 +71,13 @@ def run(feature_path, output_dir, progress):
     selected = np.flatnonzero(votes > 0)[:24]
     examples = [dict(sample_id=str(inputs.sample_ids[i]),label=int(inputs.y[i]),
         assessment=str(states[i]),pixel_votes=int(votes[i])) for i in selected]
-    ui = dict(patch_scan=patch_ui, dataset='mnist', samples=len(votes), summary=assessment['summary'], detectors=rows,
+    ui = dict(blended_scan=blended_ui, patch_scan=patch_ui, dataset='mnist', samples=len(votes), summary=assessment['summary'], detectors=rows,
         examples=examples, profile=config['name'],limitation=config['limitation'],
         result_file=str(output/'results.json'),human_review_enabled=True,training_enabled=True)
     if scan_identity((feature_path,), config) != identity:
         raise ValueError('Inputs or settings changed during scanning. Rebuild and retry.')
     full = dict(dataset='mnist',profile=config,feature_files=[str(feature_path)],
-        patch_scan=patch_result, scans={'pixels':{'detectors':results}},assessment=assessment,ui_result=ui,detector_seconds=timings)
+        blended_scan=blended_result, patch_scan=patch_result, scans={'pixels':{'detectors':results}},assessment=assessment,ui_result=ui,detector_seconds=timings)
     (output/'results.json').write_text(json.dumps(to_jsonable(full),allow_nan=False),encoding='utf-8')
     save_cache_record(output,identity)
     return to_jsonable(ui)

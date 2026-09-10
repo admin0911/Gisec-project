@@ -160,7 +160,8 @@ def scan_inputs(inputs, progress):
                 step = encoder_index * 3 + int(local_step)
             else:
                 detail = f'{encoder}: {message}'
-            progress(step, f'{step} of 6: {detail}')
+            # Leila: count label checks separately from the later backdoor stage.
+            progress(step, f'Stage 1 of 3 · Label-flip checks\nCheck {step} of 6 · {detail}')
 
         with threadpool_limits(limits=4):
             scans[encoder] = scan_calibrated_label_flips(inputs[encoder], encoder=encoder, progress=report)
@@ -215,16 +216,19 @@ def run_scan(feature_file, output_dir, progress):
     pixels = ImageInputBundle.load(resnet_path.with_name(resnet_path.name.replace('-features.npz','-images.npz')))
     # Leila: apply the frozen CIFAR bright-patch profile through the image connector.
     patch_result, patch_ui = scan_patch(pixels, assessment, progress, dataset="cifar10")
+    # Leila: run shared noise scanning after patches for every CIFAR attack setting.
+    from detectors.blended_injection.web_noise import scan_noise
+    blended_result, blended_ui = scan_noise(pixels, progress)
     if scan_identity((resnet_path,dino_path),profile) != identity:
         raise ValueError('Inputs or detector settings changed during scanning. Run a new scan.')
-    full = dict(profile=profile, feature_files=[str(resnet_path), str(dino_path)],
+    full = dict(dataset="cifar10", blended_scan=blended_result, profile=profile, feature_files=[str(resnet_path), str(dino_path)],
                 scans=scans, assessment=assessment, patch_scan=patch_result)
     selected = np.flatnonzero(assessment['flags'])[:24]
     examples = [dict(sample_id=str(assessment['sample_ids'][i]), label=to_jsonable(labels[i]),
         assessment=str(assessment['assessment'][i]),
         resnet_votes=int(assessment['vote_counts']['resnet18'][i]),
         dino_votes=int(assessment['vote_counts']['dinov2'][i])) for i in selected]
-    ui = dict(patch_scan=patch_ui, samples=len(labels), summary=assessment['summary'], detectors=rows,
+    ui = dict(dataset="cifar10", blended_scan=blended_ui, patch_scan=patch_ui, samples=len(labels), summary=assessment['summary'], detectors=rows,
         examples=examples, profile=profile['name'], limitation=profile['limitation'],
         result_file=str(output_dir / 'results.json'), human_review_enabled=False)
 

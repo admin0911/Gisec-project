@@ -8,16 +8,15 @@ const MNIST_PIXELS_ONLY = true;
 function updateAttackOptions() {
   // Leila: keep the shared encoder request, but hide its selector for MNIST pixel scanning.
   $('encoder-control').hidden = true;
-  // Leila: text scanning supports clean reviews and label flips.
+  // Leila: enable the verified phrase-backdoor build for IMDB.
   const textDataset = $('dataset').value === 'imdb';
   const cifarDataset = $('dataset').value === 'cifar10';
   for (const option of $('attack').options) {
-    option.hidden = (textDataset && !['none','label_flip'].includes(option.value))
-      || (!cifarDataset && option.value === 'blended_injection');
+    option.hidden = textDataset && !['none','label_flip','backdoor'].includes(option.value);
     option.disabled = option.hidden;
+    if (option.value === 'backdoor') option.textContent = textDataset ? 'Backdoor phrase' : 'Backdoor patch';
   }
-  if ((textDataset && !['none','label_flip'].includes($('attack').value))
-      || (!cifarDataset && $('attack').value === 'blended_injection')) $('attack').value='none';
+  if (textDataset && !['none','label_flip','backdoor'].includes($('attack').value)) $('attack').value='none';
   $('attack').disabled = false;
   $('poison-rate').disabled = $('attack').value === 'none';
   const targeted = $('attack').value === 'targeted_label_flip';
@@ -39,8 +38,10 @@ function updateWorkflowVisibility() {
   const cifar = $('dataset').value === 'cifar10';
   const labelFlip = ['label_flip', 'targeted_label_flip'].includes(attack);
   const blended = attack === 'blended_injection' && cifar;
-  $('label-flip-controls').hidden = !labelFlip;
-  $('blended-controls').hidden = !blended;
+  // Leila: saved datasets and the complete scan are available for every attack.
+  $('label-flip-controls').hidden = false;
+  // Leila: use the complete Scan dataset flow for every attack.
+  $('blended-controls').hidden = true;
   if (!blended) $('blended-result').hidden = true;
   if (!labelFlip) {
     $('last-scan').hidden = true;
@@ -125,7 +126,8 @@ $('extract').onclick = async () => {
       ? `/scan?job=${encodeURIComponent(job.job_id)}`
       : '/scan';
     $('last-scan').textContent = unifiedPipelineRun ? 'View unified results' : 'Run label-flip scan to view results';
-    $('last-scan').hidden = !unifiedPipelineRun;
+    // Leila: build-only detector results are not a complete dataset scan.
+    $('last-scan').hidden = true;
     // Leila: a pixels-only build has no encoder/PCA plot to display.
     $('result').hidden = false;
     $('plot').hidden = !!data.pixels_only;

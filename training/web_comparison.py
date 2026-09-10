@@ -13,6 +13,8 @@ from .preparation import ARTIFACTS, load_preparation, file_hash
 from .connector import training_input
 from .models import small_cnn
 from .trainer import TrainConfig, train_classifier
+# Leila: share the same holdout IDs across all comparison arms.
+from .validation import validation_split
 
 
 def validate_epochs(epochs):
@@ -31,14 +33,14 @@ def matches_clean_reference(source, reference):
     return True
 
 
-def train_comparison(version, epochs, output, progress):
+def train_comparison(version, epochs, output, progress, *, seed=42, matched_steps=False):
     validate_epochs(epochs)
     manifest = load_preparation(version)
     # Leila: choose dimensions and official splits from the frozen dataset identity.
     dataset = manifest.get('dataset','cifar10')
     if dataset == 'imdb':
         from .text_comparison import train_text_comparison
-        return train_text_comparison(manifest,epochs,output,progress)
+        return train_text_comparison(manifest,epochs,output,progress,seed=seed,matched_steps=matched_steps)
     if dataset not in ('mnist','cifar10'): raise ValueError('Unsupported training dataset.')
     shape = (1,28,28) if dataset=='mnist' else (3,32,32)
     path = Path(manifest['source_images']).resolve()
@@ -69,26 +71,38 @@ def train_comparison(version, epochs, output, progress):
     test_data = load_image_dataset(dataset,root=str(ARTIFACTS.parent/'data'),train=False,download=False)
     test = training_input(test_data,[f'{dataset}-test:{i}' for i in range(len(test_data))],
                           dataset_version=f'{dataset}-official-test',split='test')
-    config = TrainConfig(epochs=epochs,batch_size=128,seed=42,device='cpu')
+    # Leila: verify the actual CIFAR trigger before evaluating any trained arm.
+    from .image_backdoor import patch_specification, add_patch_metrics
+    patch_spec = patch_specification(manifest, images, reference.dataset)
+    config = TrainConfig(epochs=epochs,batch_size=128,seed=seed,device='cpu')
     report = dict(dataset=dataset,version=version,scan_id=manifest['scan_id'],review_revision=manifest['review_revision'],
         preparation=manifest['summary'],runs={},status='running',before_cleaning_skipped=skip_before,
         accuracy_change_reference='clean_reference' if skip_before else 'before_cleaning',
-        limitation='Clean reference uses the official clean training rows matching the input IDs, for benchmark evaluation only. Label-flip comparison, one training seed. Same epochs but filtering changes optimizer steps. Backdoor attack success is not measured here.')
+        limitation='Clean reference uses the official clean training rows matching the input IDs, for benchmark evaluation only. Label-flip comparison, one training seed. Same epochs but filtering changes optimizer steps. CIFAR patch/blended-noise ASR is evaluated when a matching attack is verified.')
     output = Path(output)
     output.mkdir(parents=True,exist_ok=True)
     # Leila: identical clean input needs only the reference and filtered models.
     arms = [('clean_reference',reference)]
     if not skip_before: arms.append(('before_cleaning',original))
     arms.append(('after_cleaning',filtered))
+    validation,arms,report['validation']=validation_split(reference,arms)
+    # Leila: reference-arm size fixes the same update budget for every arm.
+    if matched_steps:
+        from dataclasses import replace
+        config=replace(config,max_steps=epochs*((len(arms[0][1].dataset)+127)//128))
+        report['limitation']='Matched optimizer steps within this seed. Official clean reference is evaluation-only. CIFAR patch/blended-noise ASR uses non-target official test images when applicable.'
     step = 90 // len(arms)
     for index,(name,inputs) in enumerate(arms):
         progress(5+index*step,f'Model {index+1} of {len(arms)}: {name.replace("_"," ")}')
         def update(message):
             match = re.search(r'Epoch (\d+)/',message)
             epoch = int(match[1]) if match else 0
-            progress(5+index*step+int((step-2)*epoch/epochs),f'Model {index+1} of {len(arms)} · {message}')
+            progress(5+index*step+min(step-2,int((step-2)*epoch/epochs)),f'Model {index+1} of {len(arms)} \u00b7 {message}')
         run = train_classifier(inputs,test,model_factory=(lambda: small_cnn(channels=1)) if dataset=='mnist' else small_cnn,model_name='small_cnn_mnist_v1' if dataset=='mnist' else 'small_cnn_v1',num_classes=10,
-                               output_root=output/name,config=config,progress=update)
+                               output_root=output/name,config=config,progress=update,validation=validation)
+        if patch_spec is not None:
+            progress(5+index*step+step-1, f'Evaluating CIFAR image-trigger ASR: {name}')
+            add_patch_metrics(run, test, patch_spec)
         report['runs'][name] = run
         (output/'comparison.json').write_text(json.dumps(report,indent=2,allow_nan=False),encoding='utf-8')
     report['status'] = 'complete'
