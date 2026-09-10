@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>PoisonGuard · Training</title></head>
+<body><p>Opening training…</p>
+<!-- Leila: support /train on an already-running static server without interrupting scans.
+     The training controller restores context and replaces the visible address with /train. -->
+<script>
+const selection = history.state?.poisonGuardTraining;
+const query = new URLSearchParams(location.search);
+if (!query.has('scan') && !query.has('version') && selection) {
+  for (const key of ['scan','version','run']) if (selection[key]) query.set(key,selection[key]);
+}
+location.replace('/training.html' + (query.size ? '?' + query : ''));
+</script>
+<noscript>Enable JavaScript to open the training page.</noscript>
+</body></html>

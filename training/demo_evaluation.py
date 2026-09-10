@@ -13,7 +13,7 @@ def evaluate_prepared(version):
         _, scan, digest = human_review.record(manifest['scan_id'])
         if digest != manifest['scan_sha256']:
             raise ValueError('The scan evidence changed after preparation.')
-        source = human_review.image_path(scan)
+        source = human_review.text_feature_path(scan) if manifest.get('dataset')=='imdb' else human_review.image_path(scan)
         if str(source) != manifest['source_images'] or file_hash(source) != manifest['source_sha256']:
             raise ValueError('The original image bundle changed after preparation.')
         feature = Path(scan['feature_files'][0])
@@ -30,6 +30,25 @@ def evaluate_prepared(version):
                 raise ValueError('Benchmark rows or labels do not match this prepared version.')
             mask = bundle['is_poisoned'] if 'is_poisoned' in bundle else np.empty(0,dtype=bool)
             metadata = bundle['metadata'].item() if 'metadata' in bundle else {}
+        # Leila: pixels-only MNIST stores truth separately, read only after selection is frozen.
+        if manifest.get('dataset') == 'mnist' and mask.size == 0:
+            truth_path = source.with_name(source.name.replace('-images.npz','-evaluation.npz'))
+            with np.load(truth_path,allow_pickle=False) as truth:
+                if not np.array_equal(truth['sample_ids'],ids):
+                    raise ValueError('MNIST truth IDs do not match the frozen selection.')
+                mask = truth['is_poisoned']
+        # Leila: verify legacy clean IMDB labels against official rows before supplying clean truth.
+        # This evaluation-only fallback never changes scanning or selection.
+        if manifest.get('dataset') == 'imdb' and mask.size == 0 and '-none-' in feature.name:
+            from poison_features import FeatureBundle, load_imdb_dataset
+            from poison_features.imdb_identity import imdb_training_indices
+            legacy = FeatureBundle.load(feature)
+            clean = load_imdb_dataset(split='train', cache_dir=str(ARTIFACTS.parent/'data'))
+            indices = imdb_training_indices(legacy, feature, clean)
+            expected = np.array([clean[int(i)]['label'] for i in indices])
+            if not np.array_equal(legacy.labels, expected):
+                raise ValueError('The clean IMDB archive contains changed labels.')
+            mask = np.zeros(len(ids), dtype=bool)
         if not isinstance(metadata,dict):
             raise ValueError('Benchmark metadata is invalid.')
         if mask.size == 0:

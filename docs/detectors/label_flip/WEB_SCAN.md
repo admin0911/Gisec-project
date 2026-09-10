@@ -48,3 +48,15 @@ exist. No new thresholds are fitted from the dataset being scanned.
 
 Teammate-file edits are marked with `Leila:` comments. The scan adapter,
 service, frontend controller, page and styles are separate files.
+# Reusing completed scans
+
+Clicking **Scan label flips** first checks for a completed matching scan.
+Matching uses SHA-256 hashes of both feature files and both image files,
+the detector profile, implementation files and dependency versions. A match
+reopens the original scan ID, preserving saved human review decisions.
+Changed inputs or settings run a new scan. Failed or corrupted results are
+never reused. Input hashes are checked again before saving a completed scan.
+
+Older scans without cache identity records remain viewable but need one new
+scan to establish a verified reusable result. Results folders are created and
+write access checked before the detectors run.

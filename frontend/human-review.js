@@ -1,11 +1,22 @@
+// Leila: navigation uses the short scan route with the selected job preserved.
 (() => {
   const $ = id => document.getElementById(id), params = new URLSearchParams(location.search);
-  const job = params.get('job');
+  // Leila: remember the selected scan and review group while displaying /review.
+  let stored = history.state?.poisonGuardReview;
+  if (!stored) { try { stored = JSON.parse(sessionStorage.getItem('poison-guard-review') || 'null'); } catch (_) {} }
+  const selection = params.has('job') ? {job:params.get('job'),group:params.get('group')} : (stored || {});
+  const job = selection.job;
   let page = 0, pages = 1, revision = 0, busy = false, loaded = false;
-  let group = params.get('group') === 'suspected_label_flip' ? 'suspected_label_flip' : 'uncertain';
+  let group = selection.group === 'suspected_label_flip' ? 'suspected_label_flip' : 'uncertain';
+  function rememberReview() {
+    const context = {job,group};
+    history.replaceState({...(history.state || {}),poisonGuardReview:context},'', '/review');
+    try { sessionStorage.setItem('poison-guard-review',JSON.stringify(context)); } catch (_) {}
+  }
+  rememberReview();
   let size = 20, changes = {};
   $('group').value = group;
-  $('back').href = `/scan-results.html?job=${encodeURIComponent(job || '')}`;
+  $('back').href = `/scan?job=${encodeURIComponent(job || '')}`;
   function controls(value) {
     busy = value;
     // Leila: prevent duplicate Finish actions while a save or page request is pending.
@@ -16,6 +27,9 @@
   }
   async function api(route, body) {
     const response = await fetch(`/api/review/${route}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({job_id:job,...body})});
+    // Leila: show connection/server errors clearly without losing pending choices.
+    const contentType = response.headers?.get('content-type');
+    if (contentType && !contentType.includes('application/json')) throw new Error('The review server returned an unexpected response. Restart the app and retry Save.');
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Review request failed.');
     return result;
@@ -29,10 +43,13 @@
     $('review-grid').replaceChildren();
     data.items.forEach((item,index) => {
       const tile = document.createElement('article'); tile.className = 'review-tile';
-      const image = document.createElement('img'); image.src = item.image; image.alt = `Sample ${item.sample_id}, supplied label ${item.class_name}`; image.loading = 'lazy';
+      // Leila: render review text safely; image datasets retain their thumbnails.
+      const image = document.createElement(item.text != null ? 'p' : 'img');
+      if (item.text != null) { image.textContent=item.text; image.style.maxHeight='260px'; image.style.overflowY='auto'; image.style.whiteSpace='pre-wrap'; }
+      else { image.src=item.image; image.alt=`Sample ${item.sample_id}, supplied label ${item.class_name}`; image.loading='lazy'; }
       const title = document.createElement('h2'); title.textContent = `${item.class_name} · label ${item.label}`;
       const id = document.createElement('p'); id.textContent = item.sample_id;
-      const votes = document.createElement('p'); votes.textContent = `ResNet18 ${item.resnet_votes}/3 · DINOv2 ${item.dino_votes}/3`;
+      const votes = document.createElement('p'); votes.textContent = item.text_votes != null ? `MiniLM ${item.text_votes}/3` : item.pixel_votes != null ? `Pixels ${item.pixel_votes}/3` : `ResNet18 ${item.resnet_votes}/3 · DINOv2 ${item.dino_votes}/3`;
       const field = document.createElement('fieldset'), legend = document.createElement('legend'); legend.textContent = 'Your decision'; field.appendChild(legend);
       for (const [value,text] of [['keep','Keep'],['quarantine','Quarantine'],['unsure','Unsure']]) {
         const label = document.createElement('label'), input = document.createElement('input');
@@ -46,11 +63,11 @@
     if (!data.items.length) $('review-grid').textContent = 'No samples in this group.';
   }
   async function load() {
-    controls(true); $('review-status').textContent = 'Loading review images…';
+    controls(true); $('review-status').textContent = 'Loading review samples…';
     try {
       render(await api('page',{group,page,page_size:size}));
       const pending = Object.keys(changes).length;
-      $('review-status').textContent = pending ? `${pending} unsaved choice(s) across pages. Use Save review when ready.` : 'Choose a decision for any images you want to review.';
+      $('review-status').textContent = pending ? `${pending} unsaved choice(s) across pages. Use Save review when ready.` : 'Choose a decision for any samples you want to review.';
     }
     catch(error) { loaded = false; $('review-grid').replaceChildren(); $('review-status').textContent = error.message; }
     finally { controls(false); }
@@ -68,7 +85,7 @@
     if (busy) return;
     controls(true);
     // Leila: navigation only changes the view; it never saves review choices.
-    try { page = nextPage; group = nextGroup; size = nextSize; await load(); }
+    try { page = nextPage; group = nextGroup; size = nextSize; rememberReview(); await load(); }
     catch(error) { $('review-status').textContent = error.message; $('group').value = group; $('size').value = size; }
     finally { controls(false); }
   }
@@ -122,5 +139,7 @@
     await requestFinish();
   });
   window.addEventListener('beforeunload', event => { if (Object.keys(changes).length) { event.preventDefault(); event.returnValue = ''; } });
-  load();
+  // Leila: a bare review link needs a selected scan before any review request.
+  if (job) load();
+  else { controls(true); $('review-status').textContent = 'Open Human review from a completed scan first.'; }
 })();

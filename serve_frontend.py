@@ -37,11 +37,23 @@ JOBS_LOCK = threading.Lock()
 
 class FeatureHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
+        # Leila: offer a short human review route while retaining old bookmarks.
+        if self.path.split('?',1)[0] in ('/review','/review/'):
+            self.path = '/human-review.html'
+            return super().do_GET()
+        # Leila: retain legacy links while exposing the short scan results route.
+        if self.path.split('?',1)[0] in ('/scan','/scan/'):
+            self.path = '/scan-results.html'
+            return super().do_GET()
+        # Leila: serve the existing training page at the short public route.
+        if self.path.split('?',1)[0] in ('/train','/train/'):
+            self.path = '/training.html'
+            return super().do_GET()
         if self.path == "/api/datasets":
             self._json({
                 "datasets": ["cifar10", "mnist", "imdb"],
                 "attacks": ["none", "label_flip", "backdoor", "blended_injection"],
-                "text_attacks": ["none"],
+                "text_attacks": ["none", "label_flip"],
             })
             return
         if self.path.startswith("/api/jobs/"):
@@ -144,8 +156,12 @@ def run_extraction(job_id: str, request: dict) -> None:
         poison_count = None if poison_count is None else int(poison_count)
         if attack == "none":
             poison_rate = 0.0
-        if attack != "none" and poison_rate not in {0.01, 0.03, 0.05, 0.10}:
-            raise ValueError("poison_rate must be 1%, 3%, 5%, or 10%")
+        # Leila: extend label-flip experiments with 7% without changing other attacks.
+        allowed_rates = {0.01, 0.03, 0.05, 0.10}
+        if attack == "label_flip": allowed_rates.add(0.07)
+        if attack != "none" and poison_rate not in allowed_rates:
+            choices = ', '.join(f'{rate:.0%}' for rate in sorted(allowed_rates))
+            raise ValueError(f"poison_rate must be one of: {choices}")
         split = request.get("split", "train")
         artifacts = Path("artifacts")
         artifacts.mkdir(exist_ok=True)
@@ -154,6 +170,8 @@ def run_extraction(job_id: str, request: dict) -> None:
         attack_key = f"{attack}-a{blend_alpha:.2f}-t{target_label}-n{poison_count or 'rate'}"
         update_job(job_id, status="running", progress=2, message="Loading dataset")
         if name == "imdb":
+            # Leila: expose only implemented text scenarios in this scan flow.
+            if attack not in ("none","label_flip"): raise ValueError("IMDB supports clean or label flip in this flow.")
             stem = f"{name}-{split}-{size_key}-minilm-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
             feature_path = artifacts / f"{stem}-features.npz"
             if feature_path.exists():
@@ -182,9 +200,9 @@ def run_extraction(job_id: str, request: dict) -> None:
                 )
             update_job(job_id, progress=15, message=f"Encoding {total:,} reviews with MiniLM")
             bundle = extract_text(
-                texts, labels=labels, sample_ids=range(total), dataset_name=name,
+                texts, labels=labels, sample_ids=[f"imdb-{split}:{int(i)}" for i in indices], dataset_name=name,
                 original_labels=metadata.get("original_labels"),
-                is_poisoned=metadata.get("is_poisoned"),
+                is_poisoned=metadata.get("is_poisoned", np.zeros(total,dtype=bool)),
                 poison_type=metadata.get("poison_type"),
             )
             bundle.save(feature_path)
@@ -215,6 +233,29 @@ def run_extraction(job_id: str, request: dict) -> None:
         sample_ids = np.asarray([f"{name}-{split}:{i}" for i in range(total)])
         labels = np.asarray([attacked_dataset[i][1] for i in range(total)])
         metadata = getattr(attacked_dataset, "metadata", None)
+        # Leila: reversible MNIST-only bypass; omitted/false keeps the original encoder workflow.
+        if name == 'mnist' and request.get('pixels_only') is True:
+            update_job(job_id,progress=15,message='Preparing MNIST pixels; feature extraction bypassed')
+            stem = f"{name}-{split}-{size_key}-pixels-only-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
+            image_path = artifacts / f'{stem}-images.npz'
+            pixels = load_image_inputs(attacked_dataset, sample_ids=sample_ids)
+            same = False
+            if image_path.is_file():
+                previous = ImageInputBundle.load(image_path)
+                same = (np.array_equal(previous.images,pixels.images) and
+                        np.array_equal(previous.labels,pixels.labels) and
+                        np.array_equal(previous.sample_ids,pixels.sample_ids))
+            if not same: pixels.save(image_path)
+            # Leila: poison identities stay separate from the image connector used by scanning.
+            np.savez_compressed(artifacts / f'{stem}-evaluation.npz',sample_ids=sample_ids,
+                is_poisoned=np.zeros(total,dtype=bool) if metadata is None else metadata.is_poisoned[:total],
+                original_labels=labels if metadata is None else metadata.original_labels[:total])
+            result = dict(dataset='mnist',samples=total,pixels_only=True,encoder=None,
+                image_file=str(image_path),feature_file=str(image_path),
+                poisoned=0 if metadata is None else int(metadata.is_poisoned[:total].sum()),
+                visual_features=None,labels=[])
+            update_job(job_id,status='complete',progress=100,message='MNIST pixels ready',result=result)
+            return
         encoders = ["resnet18", "dinov2"] if name == "cifar10" else [encoder]
         results = []
         clean_images_path = artifacts / f"{name}-{split}-{size_key}-images.npz"

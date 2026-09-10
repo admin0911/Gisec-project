@@ -91,6 +91,8 @@ class WebScanTests(unittest.TestCase):
 
 class HTTPScanTests(unittest.TestCase):
     def setUp(self):
+        cache = patch.object(label_flip_api,'find_cached_scan',return_value=None)
+        cache.start(); self.addCleanup(cache.stop)
         handler = partial(FeatureHandler, directory=str(Path(__file__).resolve().parents[1] / 'frontend'))
         self.server = ThreadingHTTPServer(('127.0.0.1', 0), handler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -134,6 +136,19 @@ class HTTPScanTests(unittest.TestCase):
             self.assertNotIn('result',result)
         self.assertFalse(label_flip_api.SCAN_LOCK.locked())
 
+    def test_cached_scan_reopens_original_id_without_running_detectors(self):
+        cached=dict(job_id='a'*32,status='complete',progress=100,message='Saved label-flip scan loaded',result={'samples':30})
+        with patch.object(label_flip_api,'feature_pair'), \
+             patch.object(label_flip_api,'find_cached_scan',return_value=cached['job_id']), \
+             patch.object(label_flip_api,'restored_scan_job',return_value=cached), \
+             patch.object(label_flip_api,'run_scan') as run:
+            status,job=self.post('/api/label-flip/scan',{'feature_file':'test'})
+            self.assertEqual(status,200)
+            self.assertTrue(job['reused'])
+            self.assertEqual(job['job_id'],cached['job_id'])
+            self.assertEqual(self.wait(job)['result']['samples'],30)
+            run.assert_not_called()
+
     def test_malformed_request_and_double_scan(self):
         with self.assertRaises(HTTPError) as caught:
             self.post('/api/label-flip/scan', [])
@@ -151,6 +166,26 @@ class HTTPScanTests(unittest.TestCase):
             status, result = self.post('/api/label-flip/saved', {})
         self.assertEqual(status,200)
         self.assertEqual(result['pairs'][0]['feature_file'],'saved.npz')
+
+    # Leila: clean scan routes and existing bookmarks serve the same results page.
+    def test_short_scan_route_and_legacy_page(self):
+        for route in ('/scan','/scan/','/scan?job=abc','/scan-results.html?job=abc'):
+            with urlopen(self.base+route) as response:
+                self.assertEqual(response.status,200)
+                self.assertIn('id="scan-result"',response.read().decode())
+
+    def test_short_training_route_and_legacy_page(self):
+        for route in ('/train','/train/','/train?scan=abc','/training.html'):
+            with urlopen(self.base+route) as response:
+                self.assertEqual(response.status,200)
+                self.assertIn('Prepare. Train. Compare.',response.read().decode())
+
+    # Leila: short review URLs and old links serve the existing review interface.
+    def test_short_review_route_and_legacy_page(self):
+        for route in ('/review','/review/','/review?job=abc','/human-review.html?job=abc'):
+            with urlopen(self.base+route) as response:
+                self.assertEqual(response.status,200)
+                self.assertIn('id="review-grid"',response.read().decode())
 
 
 if __name__ == '__main__':

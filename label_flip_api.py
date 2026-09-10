@@ -4,6 +4,8 @@ import threading
 import uuid
 
 from detectors.label_flip.web_scan import ARTIFACTS, availability, feature_pair, run_scan, saved_feature_pairs
+from detectors.label_flip.scan_cache import find_cached_scan
+from cleaning.human_review import restored_scan_job
 
 SCAN_LOCK = threading.Lock()
 
@@ -27,7 +29,19 @@ def handle_scan_request(handler, jobs, jobs_lock, update_job):
             handler._json(availability(feature_file))
             return True
         feature_pair(feature_file)
-    except (ValueError, TypeError) as exc:
+        # Leila: reopen the original scan ID so saved human review remains attached.
+        cached_id = find_cached_scan(feature_file)
+        if cached_id:
+            try:
+                cached = restored_scan_job(cached_id)
+            except (ValueError,OSError,KeyError,TypeError):
+                cached = None
+            if cached is not None:
+                with jobs_lock:
+                    jobs[cached_id] = cached
+                handler._json(dict(job_id=cached_id,status='complete',reused=True))
+                return True
+    except (ValueError, TypeError, OSError) as exc:
         handler._json({'error': str(exc)}, status=400)
         return True
     if not SCAN_LOCK.acquire(blocking=False):

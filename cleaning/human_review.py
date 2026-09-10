@@ -52,6 +52,16 @@ def record(job_id):
     return path, data, digest
 
 
+# Leila: text stages share the saved FeatureBundle path, never fabricate image inputs.
+def text_feature_path(data):
+    path = Path(data['feature_files'][0])
+    if not path.is_absolute(): path = ARTIFACTS.parent/path
+    path = path.resolve()
+    if path.parent != ARTIFACTS.resolve() or not path.is_file():
+        raise ValueError('Matching text features are unavailable.')
+    return path
+
+
 def image_path(data):
     path = Path(data['feature_files'][0])
     if not path.is_absolute():
@@ -99,7 +109,7 @@ def review_summary(job_id):
     a = data['assessment']
     with LOCK:
         saved = _reviews(path, digest)
-    choices = [saved['decisions'].get(sid, {}).get('decision')
+    choices = [saved['decisions'].get(str(sid), {}).get('decision')
                for sid,state in zip(a['sample_ids'], a['assessment']) if state in GROUPS]
     counts = {name: choices.count(name) for name in CHOICES}
     return dict(**counts, unreviewed=choices.count(None), total=len(choices),
@@ -117,19 +127,37 @@ def review_page(job_id, group='uncertain', page=0, page_size=20):
         raise ValueError('This review page does not exist.')
     with LOCK:
         saved = _reviews(path, digest)
-    pixels = image_path(data)
-    stat = pixels.stat()
-    labels, thumbs = _thumbnails(str(pixels), stat.st_mtime_ns, stat.st_size,
-                                 tuple(a['sample_ids']), tuple(a['assessment']))
+    imdb = data.get('dataset') == 'imdb'
+    if imdb:
+        from poison_features import FeatureBundle, load_imdb_dataset
+        import re
+        bundle = FeatureBundle.load(text_feature_path(data))
+        if bundle.sample_ids.tolist() != a['sample_ids']: raise ValueError('Text IDs differ from scan.')
+        labels = bundle.labels
+        reviews_data = load_imdb_dataset(split='train',cache_dir=str(ARTIFACTS.parent/'data'))
+        from poison_features.imdb_identity import imdb_training_indices
+        indices = imdb_training_indices(bundle,text_feature_path(data),reviews_data)
+        thumbs = {}
+        for i in rows[page*page_size:(page+1)*page_size]:
+            sid=a['sample_ids'][i]
+            thumbs[sid]=reviews_data[int(indices[i])]['text']
+    else:
+        pixels = image_path(data)
+        stat = pixels.stat()
+        labels, thumbs = _thumbnails(str(pixels), stat.st_mtime_ns, stat.st_size,
+                                     tuple(a['sample_ids']), tuple(a['assessment']))
     items = []
     for i in rows[page * page_size:(page + 1) * page_size]:
         sid = a['sample_ids'][i]
         label = int(labels[i])
-        items.append(dict(sample_id=sid, label=label, class_name=CLASSES[label] if 0 <= label < 10 else str(label),
-            image=thumbs[sid], resnet_votes=a['vote_counts']['resnet18'][i],
-            dino_votes=a['vote_counts']['dinov2'][i], decision=saved['decisions'].get(sid, {}).get('decision'),
+        # Leila: MNIST reviews show digits and pixel votes, never CIFAR class names or invented encoder votes.
+        mnist = data.get('dataset') == 'mnist'
+        items.append(dict(sample_id=sid, label=label, class_name=('positive' if label else 'negative') if imdb else str(label) if mnist else CLASSES[label] if 0 <= label < 10 else str(label),
+            image=None if imdb else thumbs[sid],text=thumbs[sid] if imdb else None,text_votes=a['vote_counts']['minilm'][i] if imdb else None, resnet_votes=None if (mnist or imdb) else a['vote_counts']['resnet18'][i],
+            dino_votes=None if (mnist or imdb) else a['vote_counts']['dinov2'][i],
+            pixel_votes=a['vote_counts']['pixels'][i] if mnist else None, decision=saved['decisions'].get(str(sid), {}).get('decision'),
             assessment=a['assessment'][i]))
-    decisions = [saved['decisions'].get(a['sample_ids'][i], {}).get('decision') for i in rows]
+    decisions = [saved['decisions'].get(str(a['sample_ids'][i]), {}).get('decision') for i in rows]
     return dict(items=items, page=page, page_size=page_size, pages=pages, total=len(rows),
         revision=saved['revision'], group=group,
         resolved=sum(d in ('keep','quarantine') for d in decisions), unsure=decisions.count('unsure'),
@@ -141,7 +169,9 @@ def save_review(job_id, changes, revision):
         raise ValueError('Save 1–100 explicit sample choices with a review revision.')
     path, data, digest = record(job_id)
     a = data['assessment']
-    allowed = {sid for sid,state in zip(a['sample_ids'], a['assessment']) if state in GROUPS}
+    # Leila: JSON decision keys are strings even for legacy numeric IMDB IDs.
+    changes = {str(sid): decision for sid, decision in changes.items()}
+    allowed = {str(sid) for sid,state in zip(a['sample_ids'], a['assessment']) if state in GROUPS}
     if any(sid not in allowed or decision not in CHOICES for sid,decision in changes.items()):
         raise ValueError('Only reviewable sample IDs and Keep, Quarantine or Unsure choices are accepted.')
     with LOCK:
@@ -168,6 +198,9 @@ def save_review(job_id, changes, revision):
 def restored_scan_job(job_id):
     """Recover a completed results page after server restart without rescanning."""
     path, data, _ = record(job_id)
+    # Leila: restore the persisted MNIST presentation without assuming two image encoders.
+    if data.get('dataset') in ('mnist','imdb'):
+        return dict(job_id=job_id,status='complete',progress=100,message='Saved MNIST pixel scan loaded',result=data['ui_result'])
     a = data['assessment']
     rows = []
     for encoder, scan in data['scans'].items():

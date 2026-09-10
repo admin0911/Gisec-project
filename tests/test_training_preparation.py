@@ -44,7 +44,7 @@ class PreparationTests(unittest.TestCase):
         manifest = preparation.load_preparation(prepared['version'])
         self.assertEqual(manifest['actions'][10:14],['keep','quarantine','human_review','quarantine'])
         self.assertEqual(manifest['reasons'][13],'scanner_suspected')
-        self.assertEqual(prepared['policy_version'],'2.0')
+        self.assertEqual(prepared['policy_version'],'3.0-hold-unresolved')
         human_review.save_review(self.job,{self.ids[13]:'keep'},1)
         self.assertEqual(preparation.load_preparation(prepared['version'])['summary']['kept'],11)
         latest = preparation.prepare_dataset(self.job)

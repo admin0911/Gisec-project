@@ -23,40 +23,18 @@ def file_hash(path):
     return digest.hexdigest()
 
 
-def merge_choices(assessment, saved):
-    """Saved reviews override scanner defaults; suspected rows are quarantined."""
-    ids = assessment['sample_ids']
-    states = assessment['assessment']
-    if (len(ids) != len(states) or len(set(ids)) != len(ids) or not ids
-            or any(s not in ('not_flagged','uncertain','suspected_label_flip') for s in states)):
-        raise ValueError('Invalid or incomplete scanner assessment.')
-    allowed = {sid for sid,state in zip(ids,states) if state != 'not_flagged'}
-    decisions = saved['decisions']
-    if any(sid not in allowed or value.get('decision') not in human_review.CHOICES for sid,value in decisions.items()):
-        raise ValueError('Saved reviews contain an invalid choice or unknown sample ID.')
-    actions, reasons = [], []
-    for sid, state in zip(ids,states):
-        choice = decisions.get(sid, {}).get('decision')
-        if choice in ('keep','quarantine'):
-            actions.append(choice); reasons.append('human_'+choice)
-        elif state == 'not_flagged':
-            actions.append('keep'); reasons.append('scanner_not_flagged')
-        # Leila: quarantine scanner suspects unless a saved Unsure requests review.
-        elif state == 'suspected_label_flip' and choice != 'unsure':
-            actions.append('quarantine'); reasons.append('scanner_suspected')
-        else:
-            actions.append('human_review'); reasons.append('human_unsure' if choice == 'unsure' else 'flagged_unreviewed')
-    return dict(sample_ids=ids, actions=actions, reasons=reasons,
-                summary=dict(kept=actions.count('keep'),quarantined=actions.count('quarantine'),
-                             unresolved=actions.count('human_review'),total=len(ids)))
+# Leila: retain this public import while preview and training share one selection contract.
+from cleaning.selection import merge_choices
 
 
 def prepare_dataset(scan_id):
     scan_path, scan, digest = human_review.record(scan_id)
     with human_review.LOCK:
         reviews = deepcopy(human_review._reviews(scan_path,digest))
-    selection = merge_choices(scan['assessment'],reviews)
-    source = human_review.image_path(scan)
+    dataset = scan.get('dataset','cifar10')
+    if dataset not in ('mnist','cifar10','imdb'): raise ValueError('Unsupported training dataset.')
+    selection = merge_choices(scan['assessment'],reviews,keep_uncertain=False)
+    source = human_review.text_feature_path(scan) if dataset=='imdb' else human_review.image_path(scan)
     original_hash = file_hash(source)
     with np.load(source,allow_pickle=False) as images:
         ids, labels = images['sample_ids'], images['labels']
@@ -69,19 +47,24 @@ def prepare_dataset(scan_id):
     with np.load(feature,allow_pickle=False) as bundle:
         if not np.array_equal(bundle['sample_ids'],ids) or not np.array_equal(bundle['labels'],labels):
             raise ValueError('Saved image labels and feature labels no longer match.')
+    # Leila: verify legacy text row identities before freezing a selection.
+    if dataset=='imdb':
+        from poison_features import FeatureBundle, load_imdb_dataset
+        from poison_features.imdb_identity import imdb_training_indices
+        imdb_training_indices(FeatureBundle.load(feature),feature,load_imdb_dataset(split='train',cache_dir=str(ARTIFACTS.parent/'data')))
     if (labels.shape != ids.shape or labels.dtype.kind not in 'iu'
             or np.any((labels<0)|(labels>=10))
-            or any(not str(sid).startswith('cifar10-train:') for sid in ids)):
-        raise ValueError('Expected CIFAR-10 training samples and supplied class labels.')
+            or (dataset!='imdb' and any(not str(sid).startswith(f'{dataset}-train:') for sid in ids))):
+        raise ValueError('Expected matching training sample IDs and supplied class labels.')
     kept = np.asarray(selection['actions']) == 'keep'
     if not kept.any(): raise ValueError('No samples remain for training. Review the flagged samples first.')
     version = uuid.uuid4().hex
     manifest = dict(schema_version='1.0',version=version,scan_id=scan_id,scan_sha256=digest,
-        created_at=datetime.now(timezone.utc).isoformat(),dataset='cifar10',source_images=str(source),
+        created_at=datetime.now(timezone.utc).isoformat(),dataset=dataset,source_images=str(source),
         source_sha256=original_hash,review_revision=reviews['revision'],review_snapshot=reviews['decisions'],
-        policy_version='2.0',
+        policy_version='3.0-hold-unresolved',
         policy='human_choices_override; keep_unflagged; quarantine_suspected; hold_uncertain_or_unsure',
-        class_counts=np.bincount(labels[kept].astype(int),minlength=10).tolist(),**selection)
+        class_counts=np.bincount(labels[kept].astype(int),minlength=2 if dataset=='imdb' else 10).tolist(),**selection)
     out = PREPARATIONS/version
     out.mkdir(parents=True,exist_ok=False)
     (out/'manifest.json').write_text(json.dumps(manifest,indent=2,allow_nan=False),encoding='utf-8')

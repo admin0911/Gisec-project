@@ -1,8 +1,14 @@
 (() => {
   const get = id => document.getElementById(id);
-  const jobId = new URLSearchParams(location.search).get('job') || sessionStorage.getItem('label-flip-job');
+  // Leila: preserve this scan in its history entry while displaying the short /scan address.
+  const params = new URLSearchParams(location.search);
+  let savedJob = null;
+  try { savedJob = sessionStorage.getItem('label-flip-job'); } catch (_) {}
+  const jobId = params.has('job') ? params.get('job') : (history.state?.poisonGuardScan?.job || savedJob);
+  history.replaceState({...(history.state || {}),poisonGuardScan:{job:jobId}},'', '/scan');
+  if (jobId) { try { sessionStorage.setItem('label-flip-job',jobId); } catch (_) {} }
   const names = {knn:'kNN label disagreement', class_distance:'Class distance', confident_learning:'Confident Learning',
-    resnet18:'ResNet18', dinov2_vits14:'DINOv2'};
+    minilm:'MiniLM', pixels:'MNIST pixels', resnet18:'ResNet18', dinov2_vits14:'DINOv2'};
   const number = n => n.toLocaleString();
   // Leila: load human decisions independently so the original detector assessment remains intact.
   let reviewRequest = 0;
@@ -25,27 +31,43 @@
     }
   }
   function render(data) {
+    // Leila: describe the single pixel representation separately from the CIFAR dual encoders.
+    const mnist = data.dataset === 'mnist';
+    const imdb = data.dataset === 'imdb';
+    const single = mnist || imdb;
+
+    get('scan-description').textContent = imdb ? 'Three label-flip checks on MiniLM review features.' : mnist ? 'Three label-flip checks on original MNIST pixels.' : 'Three checks on ResNet18 features. Three on DINOv2 features.';
+    get('clean-explanation').textContent = single ? 'No detector flagged these images. This does not guarantee clean data.' : 'Not flagged by either encoder’s combined rule. This does not guarantee clean data.';
+    get('uncertain-explanation').textContent = single ? 'One of the three detectors flagged these samples.' : 'The encoders disagree. Only one reaches two detector votes.';
+    get('suspected-explanation').textContent = single ? 'At least two of three detectors flagged these samples. Suspected, not confirmed.' : 'Suspected poisoning, not confirmed. Both encoders reach at least two detector votes.';
+    // Leila: MNIST opens the shared preparation design with training disabled.
+    get('prepare-training').hidden = false;
+    get('human-review').hidden = false;
+    get('review-saved-status').hidden = false;
+    get('prepare-training').target = single ? '_blank' : '_self';
+    get('prepare-training').rel = 'noopener';
     // Leila: link completed scans to optional review while retaining original detector counts.
-    const reviewUrl = `/human-review.html?job=${encodeURIComponent(jobId)}`;
+    // Leila: the review controller keeps context and shortens this link to /review.
+    const reviewUrl = `/review?job=${encodeURIComponent(jobId)}`;
     get('human-review').href = reviewUrl;
     // Leila: prepare from this scan and its saved review choices, without starting training.
-    get('prepare-training').href = `/training.html?scan=${encodeURIComponent(jobId)}`;
+    get('prepare-training').href = `/train?scan=${encodeURIComponent(jobId)}${imdb ? '&dataset=imdb' : mnist ? '&dataset=mnist' : ''}`;
     get('review-uncertain').href = `${reviewUrl}&group=uncertain`;
     get('review-suspected').href = `${reviewUrl}&group=suspected_label_flip`;
-    get('scan-summary').textContent = `${number(data.samples)} CIFAR-10 samples scanned · Experimental assessment`;
+    get('scan-summary').textContent = `${number(data.samples)} ${imdb ? 'IMDB' : mnist ? 'MNIST' : 'CIFAR-10'} samples scanned · Experimental assessment`;
     get('not-flagged').textContent = number(data.summary.not_flagged);
     get('uncertain').textContent = number(data.summary.uncertain);
     get('suspected').textContent = number(data.summary.suspected_label_flip);
     for (const row of data.detectors) {
       const tr = document.createElement('tr');
-      for (const value of [names[row.encoder], names[row.detector], number(row.flagged), `${(row.rate*100).toFixed(2)}%`, row.threshold.toFixed(4)]) {
+      for (const value of [names[row.encoder], names[row.detector], number(row.flagged), `${(row.rate*100).toFixed(2)}%`, row.threshold_label || `> ${row.threshold.toFixed(4)}`]) {
         const td = document.createElement('td'); td.textContent = value; tr.appendChild(td);
       }
       get('detector-rows').appendChild(tr);
     }
     for (const sample of data.examples) {
       const p = document.createElement('p');
-      p.textContent = `${sample.sample_id} · supplied label ${sample.label} · ${sample.assessment.replaceAll('_',' ')} · ResNet18 ${sample.resnet_votes}/3 · DINOv2 ${sample.dino_votes}/3`;
+      p.textContent = `${sample.sample_id} · supplied label ${sample.label} · ${sample.assessment.replaceAll('_',' ')} · ${imdb ? `MiniLM ${sample.text_votes}/3` : mnist ? `Pixels ${sample.pixel_votes}/3` : `ResNet18 ${sample.resnet_votes}/3 · DINOv2 ${sample.dino_votes}/3`}`;
       get('scan-examples').appendChild(p);
     }
     if (!data.examples.length) get('scan-examples').textContent = 'No samples reached the combined review rule.';
@@ -54,6 +76,12 @@
     get('scan-file').textContent = `Saved results: ${data.result_file}`;
     get('scan-result').hidden = false;
     loadReviewSummary();
+    if (imdb) {
+
+      const e=data.demo_evaluation, pct=v=>v==null?'N/A':`${(v*100).toFixed(2)}%`;
+      get('imdb-evaluation').hidden=false;
+      get('imdb-evaluation').textContent=e ? `Demo evaluation · 2 of 3 rule · Precision ${pct(e.precision)} · Recall ${pct(e.recall)} · ${number(e.caught)} of ${number(e.known_poisoned)} poisoned reviews caught · ${number(e.false_positives)} clean reviews flagged. Known identities are used only for evaluation.` : 'Demo evaluation unavailable: no known poison metadata.';
+    }
   }
   async function poll() {
     if (!jobId) { get('scan-status').textContent = 'Start a label-flip scan from Prepare dataset.'; get('scan-progress').hidden = true; return; }

@@ -14,6 +14,7 @@ from .assessment import assess_label_flips
 from .feature_inputs import paired_feature_inputs
 from .calibrated_pipeline import scan_calibrated_label_flips
 from .thresholds import calibrated_profile
+from .scan_cache import scan_identity, save_cache_record
 
 ROOT = Path(__file__).resolve().parents[2]
 ARTIFACTS = ROOT / 'artifacts'
@@ -37,10 +38,21 @@ def feature_pair(feature_file, artifacts=ARTIFACTS):
     if not source.is_absolute():
         source = artifacts.parent / source
     source = source.resolve()
-    if source.parent != artifacts or not source.name.endswith('-features.npz'):
+    # Leila: a pixels-only MNIST build directly supplies its image connector.
+    mnist_images = source.name.startswith('mnist-train-') and source.name.endswith('-images.npz')
+    if source.parent != artifacts or not (source.name.endswith('-features.npz') or mnist_images):
         raise ValueError('Choose a saved feature extraction from this project.')
     if not source.is_file():
         raise ValueError('The saved feature file is missing. Extract features first.')
+    # Leila: MNIST needs just its aligned image bundle; shared encoder extraction stays unchanged.
+    # Leila: IMDB uses a single MiniLM feature connector.
+    if source.name.startswith('imdb-train-'):
+        return (source,)
+    if source.name.startswith('mnist-train-'):
+        pixels = source.with_name(source.name.replace('-features.npz', '-images.npz'))
+        if pixels.resolve().parent != artifacts or not pixels.is_file():
+            raise ValueError('Matching MNIST pixels are missing. Build the dataset first.')
+        return (source,)
     if not source.name.startswith('cifar10-train-'):
         raise ValueError('This paired label-flip preset currently supports CIFAR-10 training data only.')
     name = source.name
@@ -79,12 +91,28 @@ def saved_feature_pairs(artifacts=ARTIFACTS):
             continue
         pairs.append(dict(feature_file=str(dino), label=dino.name.removesuffix('-features.npz'),
                           files=[resnet.name, dino.name]))
+    # Leila: expose completed MNIST image connectors alongside CIFAR encoder pairs.
+    for path in sorted(list(Path(artifacts).glob('mnist-train-*-features.npz')) +
+                       list(Path(artifacts).glob('mnist-train-*-pixels-only-*-images.npz'))):
+        try:
+            feature_pair(str(path), artifacts)
+        except ValueError:
+            continue
+        pairs.append(dict(feature_file=str(path),label=path.name.removesuffix('-features.npz')+' · pixel scan',
+                          files=[path.name]))
+    for path in sorted(Path(artifacts).glob('imdb-train-*-features.npz')):
+        pairs.append(dict(feature_file=str(path),label=path.name.removesuffix('-features.npz'),files=[path.name]))
     return sorted(pairs, key=lambda item: ('-none-' not in item['label'], item['label']))
 
 
 def availability(feature_file):
     try:
         paths = feature_pair(feature_file)
+        # Leila: readiness describes the actual input used by the MNIST scanner.
+        if paths[0].name.startswith('imdb-train-'):
+            return dict(ready=True,dataset='imdb',message='MiniLM features ready for three provisional label-flip checks.',files=[paths[0].name])
+        if len(paths) == 1:
+            return dict(ready=True,dataset='mnist',message='MNIST pixels found. Ready for three pixel-based checks (kNN 19/20).',files=[paths[0].name])
         return dict(ready=True, message='Both feature files found. Scan will verify matching images and labels.',
                     files=[p.name for p in paths])
     except (ValueError, TypeError) as exc:
@@ -128,11 +156,21 @@ def scan_inputs(inputs, progress):
 
 def run_scan(feature_file, output_dir, progress):
     progress(0, 'Checking the saved features, images and supplied labels')
-    resnet_path, dino_path = feature_pair(feature_file)
+    # Leila: select scanning representation by dataset, not by the selected attack.
+    paths = feature_pair(feature_file)
+    if paths[0].name.startswith('imdb-train-'):
+        from .web_imdb import run
+        return run(paths[0],output_dir,progress)
+    if len(paths) == 1:
+        from .web_mnist import run
+        return run(paths[0], output_dir, progress)
+    resnet_path, dino_path = paths
     profile = web_profile()
     for package, expected in profile['versions'].items():
         if version(package) != expected:
             raise ValueError(f'This scan profile requires {package} {expected}; install the project requirements.')
+    # Leila: bind saved results to exact input bytes and detector implementation.
+    identity = scan_identity((resnet_path,dino_path),profile)
     resnet, dino = FeatureBundle.load(resnet_path), FeatureBundle.load(dino_path)
     if resnet.dataset_name != 'cifar10' or dino.dataset_name != 'cifar10':
         raise ValueError('This scan profile is for CIFAR-10 only.')
@@ -147,12 +185,19 @@ def run_scan(feature_file, output_dir, progress):
         raise ValueError('Scan needs at least 21 samples and at least five samples in each of two or more classes.')
     # Discard bundles containing evaluation-only metadata before calling detectors.
     del resnet, dino
-    scans, assessment, rows = scan_inputs(inputs, progress)
+    # Leila: fail before costly detection if the results directory cannot be written.
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=False)
+    probe = output_dir/'.write-check'
+    probe.write_text('write check',encoding='utf-8')
+    probe.unlink()
+    scans, assessment, rows = scan_inputs(inputs, progress)
+    if scan_identity((resnet_path,dino_path),profile) != identity:
+        raise ValueError('Inputs or detector settings changed during scanning. Run a new scan.')
     full = dict(profile=profile, feature_files=[str(resnet_path), str(dino_path)],
                 scans=scans, assessment=assessment)
     (output_dir / 'results.json').write_text(json.dumps(to_jsonable(full), allow_nan=False), encoding='utf-8')
+    save_cache_record(output_dir,identity)
     selected = np.flatnonzero(assessment['flags'])[:24]
     examples = [dict(sample_id=str(assessment['sample_ids'][i]), label=to_jsonable(labels[i]),
         assessment=str(assessment['assessment'][i]),

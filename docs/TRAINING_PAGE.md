@@ -44,6 +44,16 @@ are treated as clean only when the metadata explicitly records a clean run
 with zero poison rate and count. Missing or inconsistent truth is displayed
 as unavailable. The table also works for existing prepared versions.
 
+Removal precision is poisoned rows removed / all rows removed. Poison recall
+is poisoned rows removed / all known poisoned rows in the original input.
+These evaluate the final selection, including saved human choices. A zero
+denominator is shown as N/A. Neither metric is a model training input.
+
+Temporary failures while reading training status retry the same job up to
+four times. If still disconnected, **Check training status** reconnects to
+that job; it never starts a new one. Confirmed interrupted or failed runs
+show the server's reason and allow an explicit new Train & compare.
+
 **Train & compare** runs three fresh `small_cnn_v1` models using the shared
 `training.trainer.train_classifier`: clean reference, original input and kept rows. All
 use seed 42, Adam at 0.001, batch size 128 and the selected epoch count (default
@@ -70,6 +80,12 @@ the clean reference until a new comparison is started.
 Backdoor ASR is not measured by this label-flip comparison. It is one seed;
 same epochs imply different optimizer-step counts when filtering removes rows.
 
-The URL retains the prepared version and training job so refreshing does not
-restart work. Completed jobs can reopen after a server restart. A running job
+The visible URL is `/train`. The browser history entry retains the scan,
+prepared version and training job, with session storage as a fallback, so
+refreshing does not restart work. Existing `training.html?scan=...&version=...`
+links still open and are shortened after loading. A bare `/train` URL does not
+identify a particular result for someone in a different browser session.
+`frontend/train/index.html` provides a compatibility entry for servers started
+before the short route was added, so ongoing scans need not be interrupted.
+Completed jobs can reopen after a server restart. A running job
 interrupted by restart is reported as interrupted, not complete.

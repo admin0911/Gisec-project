@@ -1,10 +1,12 @@
 """Local HTTP adapter for paginated human review."""
 import json
+# Leila: evaluate saved scans independently of training and human decisions.
+from cleaning.scan_evaluation import evaluate_scan
 from cleaning.human_review import review_page, save_review, review_summary, ReviewConflict
 
 
 def handle_review_request(handler):
-    if handler.path not in ('/api/review/page', '/api/review/save', '/api/review/summary'):
+    if handler.path not in ('/api/review/page', '/api/review/save', '/api/review/summary', '/api/review/evaluation'):
         return False
     try:
         length = int(handler.headers.get('Content-Length', '0'))
@@ -14,7 +16,9 @@ def handle_review_request(handler):
         if not isinstance(request, dict):
             raise ValueError('Expected a review request.')
         job = request.get('job_id')
-        if handler.path.endswith('/summary'):
+        if handler.path.endswith('/evaluation'):
+            result = evaluate_scan(job)
+        elif handler.path.endswith('/summary'):
             result = review_summary(job)
         elif handler.path.endswith('/page'):
             result = review_page(job,request.get('group','uncertain'),request.get('page',0),request.get('page_size',20))

@@ -16,6 +16,33 @@ from detectors.label_flip.web_scan import feature_pair
 
 
 class ExtractionIntegrationTests(unittest.TestCase):
+    def test_mnist_pixels_only_skips_encoder_and_connects(self):
+        with tempfile.TemporaryDirectory() as folder:
+            previous = Path.cwd()
+            try:
+                os.chdir(folder)
+                dataset = TensorDataset(torch.rand(100,1,28,28),torch.arange(100)%10)
+                with patch.object(server,'load_image_dataset',return_value=dataset), \
+                     patch.object(server.UniversalFeatureExtractor,'extract_images') as encoder:
+                    server.JOBS['pixels'] = {}
+                    server.run_extraction('pixels',dict(dataset='mnist',full_training=True,
+                        attack='label_flip',poison_rate=.05,seed=0,pixels_only=True))
+                    job = server.JOBS.pop('pixels')
+                    self.assertEqual(job['status'],'complete',job.get('message'))
+                    encoder.assert_not_called()
+                    result = job['result']
+                    self.assertTrue(result['pixels_only'])
+                    self.assertEqual(result['poisoned'],5)
+                    image = ImageInputBundle.load(result['image_file'])
+                    self.assertEqual(image.images.shape,(100,1,28,28))
+                    self.assertEqual(feature_pair(result['feature_file'],Path('artifacts')),
+                                     (Path(result['image_file']).resolve(),))
+                    self.assertFalse(list(Path('artifacts').glob('*-features.npz')))
+                    with np.load(result['image_file']) as saved:
+                        self.assertNotIn('is_poisoned',saved.files)
+            finally:
+                os.chdir(previous)
+
     def test_dual_encoder_cache_preserves_poison_rates_and_current_labels(self):
         with tempfile.TemporaryDirectory() as folder:
             previous=Path.cwd()
@@ -38,7 +65,7 @@ class ExtractionIntegrationTests(unittest.TestCase):
                     clean=run('clean','none',0)
                     self.assertEqual([r['encoder'] for r in clean['representations']],['resnet18','dinov2'])
                     paths=[]
-                    for rate in (.05,.10):
+                    for rate in (.05,.07,.10):
                         result=run(str(rate),'label_flip',rate)
                         paths.append(result['feature_file'])
                         self.assertEqual(result['poisoned'],int(100*rate))
@@ -51,8 +78,11 @@ class ExtractionIntegrationTests(unittest.TestCase):
                             self.assertEqual(bundle.metadata['poison_rate'],rate)
                             self.assertTrue(bundle.metadata['reused_clean_features'])
                             np.testing.assert_array_equal(images.images,dataset.tensors[0].numpy())
-                    self.assertNotEqual(paths[0],paths[1])
+                    self.assertEqual(len(set(paths)),3)
                     self.assertEqual(encoder.call_count,2)  # Label flips reuse both clean encoders.
+                    server.JOBS['unsupported']={}
+                    server.run_extraction('unsupported',dict(dataset='cifar10',attack='backdoor',poison_rate=.07))
+                    self.assertEqual(server.JOBS.pop('unsupported')['status'],'error')
             finally:
                 os.chdir(previous)
 

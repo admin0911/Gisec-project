@@ -41,3 +41,17 @@ def detector_input(
         sample_ids=bundle.sample_ids,
         y=bundle.labels if label_aware else None,
     )
+
+
+# Leila: public pixel adapter produces the same truth-free DetectorInput as feature extraction.
+def image_detector_input(bundle, *, label_aware=False):
+    """Flatten an ImageInputBundle without rescaling or exposing attack metadata."""
+    import numpy as np
+    ids = np.asarray(bundle.sample_ids)
+    labels = np.asarray(bundle.labels)
+    if (ids.ndim != 1 or len(ids) != len(bundle.images) or not len(ids)
+            or ids.dtype.kind not in 'iuUS' or len(np.unique(ids)) != len(ids)
+            or labels.shape != ids.shape):
+        raise ValueError('Image connector requires unique aligned sample IDs and labels.')
+    return DetectorInput(X=bundle.images.reshape(len(ids),-1),sample_ids=ids.copy(),
+                         y=labels.copy() if label_aware else None)

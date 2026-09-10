@@ -1,10 +1,11 @@
+<!-- Leila: scan links and cached navigation scripts use /scan. -->
 <!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PoisonGuard · Human review</title>
 <!-- Leila: refresh the review stylesheet so saved browser styles cannot hide the smaller thumbnails. -->
 <link rel="stylesheet" href="/scan-results.css"><link rel="stylesheet" href="/human-review.css?v=footer-groups">
 </head><body><main class="scan-page">
-<nav><a id="back" href="/scan-results.html">← Scan results</a><span class="page-badge">HUMAN REVIEW</span></nav>
+<nav><a id="back" href="/scan">← Scan results</a><span class="page-badge">HUMAN REVIEW</span></nav>
 <h1>Review the findings</h1>
 <p class="lede">Check each image against its supplied label. Keep it, quarantine it, or mark it unsure.</p>
 <!-- Leila: training preparation reads saved choices into a new version; existing versions stay fixed. -->
@@ -45,4 +46,5 @@
     <button id="finish-save" type="button" class="primary">Save</button>
   </div>
 </dialog>
-<script src="/human-review.js?v=finish-dont-save"></script></body></html>
+<!-- Leila: refresh the controller for the short review address. -->
+<script src="/human-review.js?v=review-save-fix"></script></body></html>

@@ -1,0 +1,5 @@
+# IMDB label-flip scanning
+
+Choose IMDB, clean or label flip, scope and rate; Build dataset extracts all-MiniLM-L6-v2 embeddings. Scan uses raw 384-dimensional features through detector_input and the shared output connector. kNN 19/20, class distance 0.1 and five-fold Confident Learning are provisional starting settings, not calibrated IMDB cutoffs. Two of three flags marks suspected label error; one marks needs review.
+
+Results and individual scores are saved and cached. Known poison identities are read after scoring for demo precision/recall only. Clean runs show recall N/A. Old feature archives without truth show evaluation unavailable. Human review displays original review text and current supplied labels. Frozen preparation applies the two-of-three exclusion policy and saved human choices. Training compares fresh linear sentiment classifiers on frozen MiniLM embeddings using the separate official test split; it does not fine-tune MiniLM. Test features are cached after the first run. Review text may be truncated by the existing MiniLM encoder, so this baseline requires validation before any performance claims.

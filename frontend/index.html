@@ -1,3 +1,4 @@
+<!-- Leila: scan links and cached navigation scripts use /scan. -->
 <!doctype html>
 <html lang="en">
   <head>
@@ -30,8 +31,10 @@
         <label>Attack <select id="attack"><option value="none">Clean</option><option value="label_flip">Label flip</option><option value="backdoor">Backdoor patch</option><option value="blended_injection">Blended noise injection</option></select></label>
         <label id="target-control" hidden>Target label <input id="target-label" type="number" value="0" min="0" max="9"></label>
         <label id="alpha-control" hidden>Blend alpha <input id="blend-alpha" type="number" value="0.10" min="0.01" max="1" step="0.01"></label>
-        <label>Poison rate <select id="poison-rate"><option value="0.01">1%</option><option value="0.03">3%</option><option value="0.05" selected>5%</option><option value="0.10">10%</option></select></label>
-        <button id="extract">Extract features</button>
+        <!-- Leila: 7% is available for label-flip dataset builds. -->
+        <label>Poison rate <select id="poison-rate"><option value="0.01">1%</option><option value="0.03">3%</option><option value="0.05" selected>5%</option><option id="rate-seven" value="0.07" hidden disabled>7%</option><option value="0.10">10%</option></select></label>
+        <!-- Leila: use Build dataset as the user-facing label for the existing action. -->
+        <button id="extract">Build dataset</button>
       </section>
       <p id="status" class="status">Ready</p>
       <progress id="progress" value="0" max="100" hidden></progress>
@@ -43,8 +46,8 @@
           <select id="saved-scan-features"><option value="">Loading saved features…</option></select>
         </label>
         <button id="scan-label-flips" disabled>Scan label flips</button>
-        <p id="scan-readiness" class="help" aria-live="polite">Extract CIFAR-10 with ResNet18 and DINOv2 using the same settings first.</p>
-        <a id="last-scan" href="/scan-results.html" hidden>View last scan results</a>
+        <p id="scan-readiness" class="help" aria-live="polite">Build a dataset or select saved features to enable scanning.</p>
+        <a id="last-scan" href="/scan" hidden>View last scan results</a>
       </section>
       <section id="result" class="result" hidden>
         <strong id="summary"></strong>
@@ -63,8 +66,10 @@
       </section>
       <p class="status">Feature layer ready · connect your detector through the documented adapters</p>
     </main>
-    <script src="/app.js"></script>
+    <!-- Leila: refresh build controls so settings stay locked during extraction. -->
+    <!-- Leila: temporarily bypass MNIST encoding at build time. -->
+    <script src="/app.js?v=direct-scan-ready"></script>
     <!-- Leila: separate scan controller listens for completed feature extractions. -->
-    <script src="/label-flip.js"></script>
+    <script src="/label-flip.js?v=direct-scan-ready"></script>
   </body>
 </html>

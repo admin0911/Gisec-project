@@ -5,13 +5,16 @@
   <title>PoisonGuard · Label-flip scan</title>
   <!-- Leila: this theme belongs only to Scan results; main-page styles stay unchanged. -->
   <link rel="stylesheet" href="/scan-results.css?v=review-summary">
+<!-- Leila: reuse CIFAR evaluation styling for MNIST. -->
+<link rel="stylesheet" href="/training.css?v=precision-recall">
 </head>
 <body><main class="scan-page">
   <!-- Leila: compact navigation and a separate progress panel for the results view. -->
   <nav aria-label="Page navigation"><a href="/">← Prepare dataset</a><span class="page-badge">LABEL-FLIP ANALYSIS</span></nav>
   <p class="eyebrow">POISONGUARD / LABEL-FLIP SCAN</p>
   <h1>Scan results</h1>
-  <p class="lede">Three checks on ResNet18 features. Three on DINOv2 features.</p>
+  <!-- Leila: describe pixel or encoder checks after the result identifies its dataset. -->
+  <p id="scan-description" class="lede">Checking the selected dataset.</p>
   <div class="scan-progress-panel">
   <p id="scan-status" role="status" aria-live="polite">Loading scan…</p>
   <progress id="scan-progress" value="0" max="100" aria-label="Scan progress"></progress>
@@ -19,12 +22,14 @@
   </div>
   <section id="scan-result" hidden>
     <p id="scan-summary"></p>
+    <!-- Leila: text benchmark truth is shown only after scanning. -->
+    <p id="imdb-evaluation" class="help" hidden></p>
     <div class="assessment-grid">
       <!-- Leila: requested display labels; counts still represent detector assessments. -->
-      <article class="clean"><span>Clean</span><strong id="not-flagged"></strong><p>Not flagged by either encoder’s combined rule. This does not guarantee clean data.</p></article>
+      <article class="clean"><span>Clean</span><strong id="not-flagged"></strong><p id="clean-explanation">Not flagged by either encoder’s combined rule. This does not guarantee clean data.</p></article>
       <!-- Leila: accessible card links open the corresponding human review group. -->
-      <article class="uncertain"><a id="review-uncertain" class="review-card" href="#"><span>Needs review</span><strong id="uncertain"></strong><p>The encoders disagree. Only one reaches two detector votes.</p></a></article>
-      <article class="suspected"><a id="review-suspected" class="review-card" href="#"><span>Poisoned data</span><strong id="suspected"></strong><p>Suspected poisoning, not confirmed. Both encoders reach at least two detector votes.</p></a></article>
+      <article class="uncertain"><a id="review-uncertain" class="review-card" href="#"><span>Needs review</span><strong id="uncertain"></strong><p id="uncertain-explanation">The encoders disagree. Only one reaches two detector votes.</p></a></article>
+      <article class="suspected"><a id="review-suspected" class="review-card" href="#"><span>Poisoned data</span><strong id="suspected"></strong><p id="suspected-explanation">Suspected poisoning, not confirmed. Both encoders reach at least two detector votes.</p></a></article>
     </div>
     <!-- Leila: review is optional and appears only once scan results are ready. -->
     <p><a id="human-review" class="review-primary" href="#">Human review →</a></p>
@@ -39,7 +44,7 @@
     </div>
     <!-- Leila: keep individual detector results collapsed until the user expands them. -->
     <details><summary>More information · Individual detector results</summary>
-      <div class="table-scroll"><table><thead><tr><th>Features</th><th>Detector</th><th>Flagged</th><th>Rate</th><th>Score cutoff (strictly greater)</th></tr></thead><tbody id="detector-rows"></tbody></table></div>
+      <div class="table-scroll"><table><thead><tr><th>Features</th><th>Detector</th><th>Flagged</th><th>Rate</th><th>Flag rule</th></tr></thead><tbody id="detector-rows"></tbody></table></div>
     </details>
     <details><summary>More information · sample findings</summary>
       <p class="help">Up to 24 flagged sample IDs in dataset order. All scores and decisions are saved in the results file.</p>
@@ -52,4 +57,4 @@
     <p style="margin-top:28px"><a id="prepare-training" class="review-primary" href="#">Prepare training dataset →</a></p>
   </section>
 <!-- Leila: refresh the results controller to show current saved reviews after returning. -->
-</main><script src="/scan-results.js?v=training-preparation"></script></body></html>
+</main><!-- Leila: use the short human review links. --><script src="/scan-results.js?v=imdb-review-training"></script></body></html>

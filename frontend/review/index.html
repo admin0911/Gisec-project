@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>PoisonGuard · Human review</title></head>
+<body><p>Opening human review…</p>
+<!-- Leila: allow the running server to open /review without interrupting active work. -->
+<script>
+const query = new URLSearchParams(location.search);
+const selection = history.state?.poisonGuardReview;
+if (!query.has('job') && selection?.job) {
+  query.set('job',selection.job);
+  if (selection.group) query.set('group',selection.group);
+}
+location.replace('/human-review.html' + (query.size ? '?' + query : ''));
+</script>
+<noscript>Enable JavaScript to open human review.</noscript>
+</body></html>

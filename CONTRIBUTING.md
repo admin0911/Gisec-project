@@ -65,7 +65,8 @@ The frontend's **Extraction scope** controls workload:
 
 Choose **Clean**, **Label flip**, **Backdoor patch**, or **Blended noise
 injection**. For attacks, use only the provided 1%, 3%, 5%, or 10% poison
-rates. Clean runs have no poisoned rows. Blended injection uses a shared
+rates. <!-- Leila: document the additional label-flip experiment rate. -->
+Label flipping also supports 7%. Clean runs have no poisoned rows. Blended injection uses a shared
 low-amplitude noise pattern, default `alpha=0.10`, and target label `0`
 (airplane for CIFAR-10); a full 3% CIFAR-10 run is approximately 1,500 rows.
 Completed image runs create matching `*-features.npz` and

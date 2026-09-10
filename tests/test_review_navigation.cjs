@@ -16,6 +16,9 @@ async function scenario(change, failure, action='back', cancel=false, browse=fal
     created.push(e); return e;
   }
   const context = {
+    // Leila: review navigation remembers context without saving pending decisions.
+    history:{state:null,replaceState(state,_,url){this.state=state;this.url=url}},
+    sessionStorage:{getItem(){return null},setItem(){}},
     URLSearchParams, location:{search:'?job='+'a'.repeat(32)},
     document:{getElementById:id => nodes[id] ||= element(id), createElement:element,
       createTextNode:text => text, querySelectorAll:() => []},
@@ -29,6 +32,8 @@ async function scenario(change, failure, action='back', cancel=false, browse=fal
     }
   };
   vm.runInNewContext(code,context);
+  assert.equal(context.history.url,'/review');
+  assert.equal(context.history.state.poisonGuardReview.job,'a'.repeat(32));
   await new Promise(resolve => setImmediate(resolve));
   if (change) created.find(e => e.tag === 'input' && e.value === 'keep').handlers.change();
   if (browse) {
@@ -53,7 +58,7 @@ async function scenario(change, failure, action='back', cancel=false, browse=fal
     if (cancel) {
       assert.equal(calls.filter(c => c.route.endsWith('/save')).length,0);
       assert.equal(locations.length,cancel === 'discard' ? 1 : 0);
-      if (cancel === 'discard') assert.equal(locations[0],'/scan-results.html?job='+'a'.repeat(32));
+      if (cancel === 'discard') assert.equal(locations[0],'/scan?job='+'a'.repeat(32));
       let blocked = false;
       events.beforeunload({preventDefault() { blocked = true; }});
       assert.equal(blocked,cancel !== 'discard');
@@ -68,7 +73,7 @@ async function scenario(change, failure, action='back', cancel=false, browse=fal
     assert.equal(locations.length,0);
     assert.match(nodes['review-status'].textContent,/Your choices are still on this page/);
   } else {
-    assert.deepEqual(locations,['/scan-results.html?job='+'a'.repeat(32)]);
+    assert.deepEqual(locations,['/scan?job='+'a'.repeat(32)]);
     let blocked = false;
     events.beforeunload({preventDefault() { blocked = true; }});
     assert.equal(blocked,false);
