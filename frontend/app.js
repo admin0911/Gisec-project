@@ -104,6 +104,8 @@ $('extract').onclick = async () => {
     if (scanSettings() === extractionSettings) {
       document.dispatchEvent(new CustomEvent('features-ready', {detail: data}));
     }
+    $('last-scan').href = `/scan?job=${encodeURIComponent(job.job_id)}`;
+    $('last-scan').hidden = false;
     // Leila: a pixels-only build has no encoder/PCA plot to display.
     $('result').hidden = false;
     $('plot').hidden = !!data.pixels_only;

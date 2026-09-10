@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PoisonGuard · Label-flip scan</title>
+  <title>Gisec · Detector results</title>
   <!-- Leila: this theme belongs only to Scan results; main-page styles stay unchanged. -->
   <link rel="stylesheet" href="/scan-results.css?v=review-summary">
 <!-- Leila: reuse CIFAR evaluation styling for MNIST. -->
@@ -11,7 +11,7 @@
 <body><main class="scan-page">
   <!-- Leila: compact navigation and a separate progress panel for the results view. -->
   <nav aria-label="Page navigation"><a href="/">← Prepare dataset</a><!-- Leila: this page includes label-flip and patch scans. --><span class="page-badge">DATA POISONING ANALYSIS</span></nav>
-  <p class="eyebrow">POISONGUARD / LABEL-FLIP SCAN</p>
+  <p class="eyebrow">GISEC / DETECTOR PIPELINE</p>
   <h1>Scan results</h1>
   <!-- Leila: describe pixel or encoder checks after the result identifies its dataset. -->
   <p id="scan-description" class="lede">Checking the selected dataset.</p>
@@ -32,6 +32,16 @@
     </section>
     <!-- Leila: text benchmark truth is shown only after scanning. -->
     <p id="imdb-evaluation" class="help" hidden></p>
+    <section id="blended-pipeline-results" hidden>
+      <h2>Blended-injection detector</h2>
+      <p id="blended-pipeline-summary" class="help"></p>
+      <div class="assessment-grid">
+        <article class="clean"><span>Target class</span><strong id="pipeline-target">—</strong><p>Automatically discovered from shared residual evidence.</p></article>
+        <article class="uncertain"><span>Flagged samples</span><strong id="pipeline-flagged">0</strong><p>Detector findings requiring interpretation.</p></article>
+        <article class="suspected"><span>Class contrast</span><strong id="pipeline-contrast">0.00</strong><p>Higher contrast indicates a stronger shared signal.</p></article>
+      </div>
+      <p class="help">These are detector findings, not proof of poisoning. Use the dedicated detector panel for detailed scores.</p>
+    </section>
     <!-- Leila: these cards describe label-flip results only. -->
     <h2>Label-flip findings</h2>
     <div class="assessment-grid">

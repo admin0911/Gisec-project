@@ -376,6 +376,16 @@ def run_extraction(job_id: str, request: dict) -> None:
         # Leila: copy the primary result so the JSON response has no circular reference.
         primary = dict(results[0])
         primary["representations"] = results
+        # Keep the blended detector in the same pipeline job as extraction so
+        # the results page can present one complete run.
+        if attack == "blended_injection" and name == "cifar10":
+            image_path = Path(results[0]["image_file"])
+            update_job(job_id, progress=98, message="Running blended-injection detector")
+            primary["detectors"] = {
+                "blended_injection": to_jsonable(
+                    scan_as_connector_result(ImageInputBundle.load(image_path))
+                )
+            }
         update_job(job_id, status="complete", progress=100, message="Extraction complete", result=primary)
     except Exception as exc:
         update_job(job_id, status="error", progress=100, message=str(exc))

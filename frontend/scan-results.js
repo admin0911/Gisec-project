@@ -31,6 +31,10 @@
     }
   }
   function render(data) {
+    if (data && data.detectors) {
+      renderPipeline(data);
+      return;
+    }
     // Leila: describe the single pixel representation separately from the CIFAR dual encoders.
     const mnist = data.dataset === 'mnist';
     const imdb = data.dataset === 'imdb';
@@ -108,6 +112,28 @@
       get('imdb-evaluation').hidden=false;
       get('imdb-evaluation').textContent=e ? `Demo evaluation · 2 of 3 rule · Precision ${pct(e.precision)} · Recall ${pct(e.recall)} · ${number(e.caught)} of ${number(e.known_poisoned)} poisoned reviews caught · ${number(e.false_positives)} clean reviews flagged. Known identities are used only for evaluation.` : 'Demo evaluation unavailable: no known poison metadata.';
     }
+  }
+  function renderPipeline(data) {
+    const detector = data.detectors.blended_injection;
+    const evidence = detector.evidence || {};
+    const flags = detector.flags || [];
+    const flagged = flags.filter(Boolean).length;
+    get('scan-description').textContent = `${data.samples.toLocaleString()} CIFAR-10 samples processed through the detector pipeline.`;
+    get('scan-summary').textContent = 'Extraction complete · applicable detectors complete';
+    get('blended-pipeline-summary').textContent = evidence.target_class === null || evidence.target_class === undefined
+      ? 'No blended-injection signature identified.'
+      : `Target class ${evidence.target_class} identified · ${flagged.toLocaleString()} samples flagged for review.`;
+    get('pipeline-target').textContent = evidence.target_class ?? 'None';
+    get('pipeline-flagged').textContent = flagged.toLocaleString();
+    get('pipeline-contrast').textContent = Number(evidence.contrast || 0).toFixed(2);
+    get('blended-pipeline-results').hidden = false;
+    get('scan-result').querySelector('.visual-summary').hidden = true;
+    get('review-uncertain').closest('.assessment-grid').hidden = true;
+    get('patch-results').hidden = true;
+    get('scan-result').querySelectorAll(':scope > details').forEach(details => { details.hidden = true; });
+    get('human-review').hidden = true;
+    get('prepare-training').hidden = true;
+    get('scan-result').hidden = false;
   }
   async function poll() {
     if (!jobId) { get('scan-status').textContent = 'Start a label-flip scan from Prepare dataset.'; get('scan-progress').hidden = true; return; }
