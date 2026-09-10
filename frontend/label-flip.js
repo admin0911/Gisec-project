@@ -12,9 +12,9 @@
     if (!header) return 'Saved dataset · details unavailable';
     const dataset = {cifar10:'CIFAR-10',mnist:'MNIST',imdb:'IMDB'}[header[1]];
     const size = header[3] === 'full' ? `Full ${header[2] === 'train' ? 'training' : 'test'} dataset` : `${Number(header[3]).toLocaleString()} ${header[1] === 'imdb' ? 'reviews' : 'images'}`;
-    const attack = name.match(/-(targeted_label_flip|label_flip|blended_injection|backdoor|none)-/);
+    const attack = name.match(/-(targeted_label_flip|label_flip|blended_injection|mixed_noise|mixed_all|backdoor|none)-/);
     const kind = attack?.[1];
-    const attacks = {none:'Clean',label_flip:'Random label flip',targeted_label_flip:'Targeted label flip',backdoor:header[1] === 'imdb'?'Backdoor phrase':'Backdoor patch',blended_injection:'Blended noise'};
+    const attacks = {mixed_noise:'Mixed: label flip + noise',mixed_all:'Mixed: label flip + patch + noise',none:'Clean',label_flip:'Random label flip',targeted_label_flip:'Targeted label flip',backdoor:header[1] === 'imdb'?'Backdoor phrase':'Backdoor patch',blended_injection:'Blended noise'};
     const parts = [dataset, attacks[kind] || 'Attack unspecified'];
     const count = name.match(/-n(\d+)-/);
     const rate = name.match(/-(\d{3})-seed/);
@@ -25,9 +25,9 @@
     parts.push(size);
     const source = name.match(/-s(\d+)-/), target = name.match(/-t(\d+)-/);
     if (kind === 'targeted_label_flip' && source && target) parts.push(`Label ${source[1]} → ${target[1]}`);
-    else if (['backdoor','blended_injection'].includes(kind) && target) parts.push(`Target ${target[1]}`);
+    else if (['backdoor','blended_injection','mixed_noise','mixed_all'].includes(kind) && target) parts.push(`Target ${target[1]}`);
     const alpha = name.match(/-a([\d.]+)-/);
-    if (kind === 'blended_injection' && alpha) parts.push(`Blend ${Number(alpha[1])}`);
+    if (['blended_injection','mixed_noise','mixed_all'].includes(kind) && alpha) parts.push(`Blend ${Number(alpha[1])}`);
     const seed = name.match(/-seed(\d+)/);
     if (seed) parts.push(`Seed ${seed[1]}`);
     return parts.join(' · ');

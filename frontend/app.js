@@ -20,13 +20,16 @@ function updateAttackOptions() {
   $('attack').disabled = false;
   $('poison-rate').disabled = $('attack').value === 'none';
   const targeted = $('attack').value === 'targeted_label_flip';
-  const blended = $('attack').value === 'blended_injection';
+  // Leila: mixed attacks expose the shared trigger controls.
+  const mixed = ['mixed_noise','mixed_all'].includes($('attack').value);
+  if ($('mixed-note')) $('mixed-note').hidden = !mixed;
+  const blended = $('attack').value === 'blended_injection' || mixed;
   const targetRequired = targeted || blended || $('attack').value === 'backdoor';
   $('source-control').hidden = !targeted;
   $('target-control').hidden = !targetRequired;
   $('alpha-control').hidden = !blended;
   // Leila: offer 7% for both label-flip and patch-backdoor builds.
-  const labelFlip = ['label_flip', 'targeted_label_flip', 'backdoor'].includes($('attack').value);
+  const labelFlip = ['label_flip', 'targeted_label_flip', 'backdoor', 'mixed_noise', 'mixed_all'].includes($('attack').value);
   $('rate-seven').hidden = !labelFlip; $('rate-seven').disabled = !labelFlip;
   if (!labelFlip && $('poison-rate').value === '0.07') $('poison-rate').value = '0.05';
   updateWorkflowVisibility();
@@ -114,6 +117,10 @@ $('extract').onclick = async () => {
     $('summary').textContent = data.pixels_only ? `${data.samples} MNIST images ready · pixel scanning` : representations
       .map(item => `${item.encoder || 'minilm'}: ${item.samples} samples · ${item.feature_dim}D raw · ${item.reduced_dim}D PCA`)
       .join(' | ');
+    if (data.attack_counts && ['mixed_noise','mixed_all'].includes($('attack').value)) {
+      const names={label_flip:'label flips',backdoor:'patches',blended_injection:'noise'};
+      $('summary').textContent += ' · ' + Object.entries(data.attack_counts).map(([k,n])=>`${n} ${names[k] || k}`).join(' · ');
+    }
     $('artifacts').textContent = data.feature_file
       ? `Saved for reuse: ${representations.map(item => `${item.feature_file}${item.image_file ? ` · images: ${item.image_file}` : ''}`).join(' | ')}`
       : '';

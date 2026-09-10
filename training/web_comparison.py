@@ -91,6 +91,9 @@ def train_comparison(version, epochs, output, progress, *, seed=42, matched_step
         from dataclasses import replace
         config=replace(config,max_steps=epochs*((len(arms[0][1].dataset)+127)//128))
         report['limitation']='Matched optimizer steps within this seed. Official clean reference is evaluation-only. CIFAR patch/blended-noise ASR uses non-target official test images when applicable.'
+    # Leila: mixed training is supported; separate trigger ASRs are not yet evaluated.
+    if any(f'-{kind}-' in Path(manifest['source_images']).name for kind in ('mixed_noise','mixed_all')):
+        report['limitation'] += ' Mixed-attack accuracy is evaluated; separate patch/noise ASRs are not measured for mixed runs.'
     step = 90 // len(arms)
     for index,(name,inputs) in enumerate(arms):
         progress(5+index*step,f'Model {index+1} of {len(arms)}: {name.replace("_"," ")}')

@@ -33,7 +33,7 @@ class PoisonedImageDataset:
     ) -> None:
         if not 0 <= poison_rate <= 1:
             raise ValueError("poison_rate must be between 0 and 1")
-        if attack not in {"label_flip", "targeted_label_flip", "backdoor", "blended_injection"}:
+        if attack not in {"label_flip", "targeted_label_flip", "backdoor", "blended_injection", "mixed_noise", "mixed_all"}:
             raise ValueError("unsupported image attack")
         if attack == "targeted_label_flip":
             if source_label is None:
@@ -53,6 +53,34 @@ class PoisonedImageDataset:
         labels = np.asarray([int(dataset[i][1]) for i in range(len(dataset))])
         rng = np.random.default_rng(seed)
         count = int(round(len(labels) * poison_rate)) if poison_count is None else poison_count
+        # Leila: mixed groups are disjoint and never exceed 10% of the submitted rows.
+        if attack in {"mixed_noise", "mixed_all"}:
+            if poison_count is None: count = int(np.floor(len(labels)*poison_rate))
+            if poison_rate > .10 or count > len(labels)//10:
+                raise ValueError("Mixed attacks must poison at most 10% in total")
+            if not 0 <= target_label < 10:
+                raise ValueError("target_label must be between 0 and 9")
+            kinds = ["label_flip", "blended_injection"] if attack == "mixed_noise" else ["label_flip", "backdoor", "blended_injection"]
+            sizes = [count//len(kinds) + (i < count%len(kinds)) for i in range(len(kinds))]
+            if count and min(sizes) == 0:
+                raise ValueError("Increase dataset size or total rate so each mixed attack has a sample")
+            types = np.full(len(labels), "clean", dtype="U20")
+            trigger_count = sum(sizes[1:])
+            eligible = np.flatnonzero(labels != target_label)
+            if trigger_count > len(eligible):
+                raise ValueError("Not enough non-target samples for mixed triggers")
+            trigger_rows = rng.choice(eligible, trigger_count, replace=False)
+            offset = 0
+            for kind, size in zip(kinds[1:], sizes[1:]):
+                types[trigger_rows[offset:offset+size]] = kind
+                offset += size
+            label_rows = rng.choice(np.flatnonzero(types == "clean"), sizes[0], replace=False)
+            types[label_rows] = "label_flip"
+            current = labels.copy()
+            current[label_rows] = (current[label_rows]+1)%10
+            current[trigger_rows] = target_label
+            self.metadata = PoisonMetadata(labels,current,types != "clean",types)
+            return
         candidates = np.arange(len(labels))
         if attack in {"targeted_label_flip", "blended_injection"}:
             if attack == "targeted_label_flip":
@@ -83,10 +111,10 @@ class PoisonedImageDataset:
 
     def __getitem__(self, index: int) -> tuple[Any, int]:
         image, _ = self.dataset[index]
-        if self.attack == "backdoor" and self.metadata.is_poisoned[index]:
+        if self.metadata.poison_type[index] == "backdoor":
             image = image.clone()
             image[..., -3:, -3:] = 1.0
-        elif self.attack == "blended_injection" and self.metadata.is_poisoned[index]:
+        elif self.metadata.poison_type[index] == "blended_injection":
             image = image.clone().float()
             generator = np.random.default_rng(self._noise_seed)
             noise = np.clip(

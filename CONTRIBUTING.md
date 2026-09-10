@@ -53,66 +53,22 @@ Pass a `PoisonedImageDataset` to receive post-attack pixels. Do not put pixels
 into `FeatureBundle` vectors or use evaluation-only poison metadata while
 scoring.
 
-## Creating extraction runs
+## Runs and integration
 
-The frontend's **Extraction scope** controls workload:
+Use the [README](README.md) for setup, supported scenarios and verification.
+The [feature API](docs/FEATURES.md) covers custom inputs; the
+[connector guide](docs/CONNECTORS.md) covers detector outputs and identity checks.
+Use [Evaluation](docs/EVALUATION.md) for calibration and benchmark requirements.
+Keep input IDs, dataset version and encoder configuration fixed when comparing
+methods. Never pass synthetic poison truth into scoring or selection.
 
-- **Quick sample** uses the requested sample count and is the normal choice
-  while developing or debugging a detector.
-- **Whole training split** hides the sample-count control and processes every
-  row in the selected training split. The API equivalent is
-  `{"full_training": true}`.
+## Publish and synchronize
 
-Choose **Clean**, **Random label flip**, **Targeted label flip**, **Backdoor
-patch**, or **Blended noise injection**. For attacks, use only the provided
-1%, 3%, 5%, 7%, or 10% poison rates where supported. Clean runs have no
-poisoned rows. Targeted label flip selects poisoned rows only from the
-configured source class and changes them to the configured target class;
-source and target must differ. Blended injection uses a shared
-low-amplitude noise pattern, default `alpha=0.10`, and target label `0`
-(airplane for CIFAR-10); a full 3% CIFAR-10 run is approximately 1,500 rows.
-Completed image runs create matching `*-features.npz` and
-`*-images.npz` files under `artifacts/`; load them with
-`FeatureBundle.load(...)` and `ImageInputBundle.load(...)` rather than
-re-encoding the dataset.
-
-### Comparing ResNet-18 and DINOv2
-
-For image detectors, CIFAR-10 automatically produces both `resnet18` (512D)
-and `dinov2` (384D); MNIST uses the **Image features** selector to choose one.
-Keep the dataset split, sample IDs,
-attack, poison rate, seed, and detector settings identical when comparing
-them. The two runs are saved as separate artifacts because their feature
-spaces are not interchangeable. DINOv2 downloads its pretrained weights on
-first use and requires internet access then.
-
-Random and targeted label-flip runs reuse matching clean feature and image
-artifacts and only replace labels plus evaluation metadata. Pixel-changing attacks such as
-backdoors and blended injection must be re-encoded.
-
-The feature bundle and image bundle use the same stable `sample_ids`.
-Backdoor image bundles contain the patched post-attack pixels. Labels remain
-separate, and `is_poisoned`/`poison_type` are evaluation-only values: detector
-scoring must not read them.
-
-For blended-injection detectors, use the saved post-injection pixels as well
-as embeddings. Look for weak shared residual or frequency signals across
-many samples and their association with the target label. Do not expect a
-single image or a single ResNet coordinate to reveal a 10% blend reliably.
-
-### Blended-injection detector checklist
-
-- [ ] Create branch `detector/blended-injection`
-- [ ] Begin with a 3% CIFAR-10 blended run, target `0`, `alpha=0.10`
-- [ ] Load matching `*-features.npz` and `*-images.npz` artifacts
-- [ ] Use pixels, embeddings, current labels, and stable sample IDs
-- [ ] Search for shared weak residual or frequency signals across samples
-- [ ] Return one finite suspicion score per sample
-- [ ] Preserve sample IDs and keep poison metadata out of scoring
-- [ ] Test clean data and 1%, 3%, 5%, and 10% blended runs
-- [ ] Add implementation under `detectors/` and tests under `tests/`
-- [ ] Run `python -m unittest discover -s tests -v`
-- [ ] Open a pull request into `main`
+Review the diff and test results, commit the intended files, then push your
+feature branch and open a pull request into main. To bring main into an existing
+shared branch, fetch and merge origin/main, resolve conflicts preserving both
+features, and rerun checks before pushing. Do not blindly accept one side of a
+shared-file conflict. A merge avoids rewriting published branch history.
 
 ## Pull request checklist
 

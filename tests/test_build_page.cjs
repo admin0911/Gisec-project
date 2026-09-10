@@ -1,12 +1,13 @@
 const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert');
 const code=fs.readFileSync(path.join(__dirname,'..','frontend','app.js'),'utf8');
 function page(hold=false,fail=false) {
-  const ids=['dataset','encoder','scope','limit','attack','poison-rate','target-label','blend-alpha'];
+  const ids=['dataset','encoder','scope','limit','attack','poison-rate','source-label','target-label','blend-alpha'];
   const nodes={},events=[],requests=[]; let release;
   const element=()=>({value:'',textContent:'Ready',hidden:false,disabled:false,listeners:{},addEventListener(n,f){this.listeners[n]=f}});
-  for(const id of [...ids,'encoder-control','target-control','alpha-control','sample-control','rate-seven','status','progress','progress-copy','result','summary','artifacts','extract','plot'])nodes[id]=element();
-  for(const [id,value] of Object.entries({dataset:'cifar10',encoder:'resnet18',scope:'full',limit:'100',attack:'none','poison-rate':'0.05','target-label':'0','blend-alpha':'0.10'})) nodes[id].value=value;
-  nodes.attack.options=['none','label_flip','backdoor','blended_injection'].map(value=>({value}));
+  // Leila: mirror the real build form and shared scan containers.
+  for(const id of [...ids,'source-control','label-flip-controls','blended-controls','blended-result','last-scan','encoder-control','target-control','alpha-control','sample-control','rate-seven','status','progress','progress-copy','result','summary','artifacts','extract','plot'])nodes[id]=element();
+  for(const [id,value] of Object.entries({dataset:'cifar10',encoder:'resnet18',scope:'full',limit:'100',attack:'none','poison-rate':'0.05','source-label':'1','target-label':'0','blend-alpha':'0.10'})) nodes[id].value=value;
+  nodes.attack.options=['none','label_flip','targeted_label_flip','backdoor','blended_injection'].map(value=>({value}));
   nodes.plot.getContext=()=>({clearRect(){},beginPath(){},arc(){},fill(){}});
   const payload={dataset:'cifar10',samples:1,feature_dim:512,reduced_dim:2,poisoned:0,visual_features:[[0,0]],labels:[0],feature_file:'saved'};
   vm.runInNewContext(code,{document:{getElementById:id=>nodes[id],querySelectorAll:()=>ids.map(id=>nodes[id]),dispatchEvent:e=>events.push(e)},
@@ -18,6 +19,19 @@ function page(hold=false,fail=false) {
 }
 (async()=>{
   let p=page();
+  // Leila: validate targeted image controls and the deliberately restricted IMDB options.
+  p.nodes.attack.value='targeted_label_flip';p.nodes.attack.onchange();
+  assert(!p.nodes['source-control'].hidden);assert(!p.nodes['target-control'].hidden);
+  await p.nodes.extract.onclick();
+  assert.equal(p.requests[0].body.source_label,1);
+  assert.equal(p.requests[0].body.attack,'targeted_label_flip');
+  p.nodes.dataset.value='imdb';p.nodes.dataset.onchange();
+  assert.equal(p.nodes.attack.value,'none');assert(p.nodes['source-control'].hidden);
+  for(const option of p.nodes.attack.options) {
+    assert.equal(option.hidden,!['none','label_flip','backdoor'].includes(option.value));
+    assert.equal(option.disabled,option.hidden);
+  }
+  p=page();
   // Leila: the shared extraction request remains, but MNIST does not expose encoder choices.
   p.nodes.dataset.value='mnist';p.nodes.dataset.onchange();assert(p.nodes['encoder-control'].hidden);
   assert(p.nodes['rate-seven'].hidden);
@@ -28,7 +42,7 @@ function page(hold=false,fail=false) {
   assert.equal(p.requests[0].body.poison_rate,.07);
   assert(p.nodes.status.textContent.includes('Dataset ready'));
   assert.equal(p.events.length,1);
-  for(const id of ['dataset','encoder','scope','limit','attack','poison-rate','target-label','blend-alpha']) {
+  for(const id of ['dataset','encoder','scope','limit','attack','poison-rate','source-label','target-label','blend-alpha']) {
     p.nodes.status.textContent='Ready';p.nodes.result.hidden=false;p.nodes.progress.hidden=false;
     p.nodes[id].listeners.input();
     assert.equal(p.nodes.status.textContent,'');assert(p.nodes.result.hidden);assert(p.nodes.progress.hidden);
@@ -42,7 +56,7 @@ function page(hold=false,fail=false) {
   assert.equal(p.nodes['poison-rate'].value,'0.05');assert(p.nodes['rate-seven'].disabled);
   p=page(true);const pending=p.nodes.extract.onclick();
   // Leila: every build setting is locked, and duplicate clicks cannot start another job.
-  for(const id of ['dataset','encoder','scope','limit','attack','poison-rate','target-label','blend-alpha']) assert(p.nodes[id].disabled);
+  for(const id of ['dataset','encoder','scope','limit','attack','poison-rate','source-label','target-label','blend-alpha']) assert(p.nodes[id].disabled);
   await p.nodes.extract.onclick();assert.equal(p.requests.length,1);
   p.nodes.limit.value='200';p.nodes.limit.listeners.input();
   p.release();await pending;
@@ -52,7 +66,7 @@ function page(hold=false,fail=false) {
   p=page(true,true);p.nodes.attack.value='label_flip';p.nodes.attack.onchange();
   const failed=p.nodes.extract.onclick();assert(p.nodes['poison-rate'].disabled);
   p.release();await failed;
-  for(const id of ['dataset','encoder','scope','limit','attack','poison-rate','target-label','blend-alpha']) assert.equal(p.nodes[id].disabled,false);
+  for(const id of ['dataset','encoder','scope','limit','attack','poison-rate','source-label','target-label','blend-alpha']) assert.equal(p.nodes[id].disabled,false);
   assert(p.nodes.status.textContent.includes('Error: Build failed'));
   assert.equal(p.nodes.extract.disabled,false);
   console.log('Passed: 7% label flip and backdoor, reset on every setting, and stale build completion.');
