@@ -25,6 +25,7 @@ class PoisonedImageDataset:
         *,
         attack: str,
         poison_rate: float = 0.05,
+        source_label: int | None = None,
         target_label: int = 0,
         blend_alpha: float = 0.10,
         poison_count: int | None = None,
@@ -32,14 +33,20 @@ class PoisonedImageDataset:
     ) -> None:
         if not 0 <= poison_rate <= 1:
             raise ValueError("poison_rate must be between 0 and 1")
-        if attack not in {"label_flip", "backdoor", "blended_injection"}:
+        if attack not in {"label_flip", "targeted_label_flip", "backdoor", "blended_injection"}:
             raise ValueError("unsupported image attack")
+        if attack == "targeted_label_flip":
+            if source_label is None:
+                raise ValueError("source_label is required for targeted_label_flip")
+            if source_label == target_label:
+                raise ValueError("source_label and target_label must differ")
         if not 0 < blend_alpha <= 1:
             raise ValueError("blend_alpha must be greater than 0 and at most 1")
         if poison_count is not None and not 0 <= poison_count <= len(dataset):
             raise ValueError("poison_count must fit within the dataset")
         self.dataset = dataset
         self.attack = attack
+        self.source_label = source_label
         self.target_label = target_label
         self.blend_alpha = blend_alpha
         self._noise_seed = seed + 104729
@@ -47,16 +54,21 @@ class PoisonedImageDataset:
         rng = np.random.default_rng(seed)
         count = int(round(len(labels) * poison_rate)) if poison_count is None else poison_count
         candidates = np.arange(len(labels))
-        if attack == "blended_injection":
-            non_target = candidates[labels != target_label]
-            if len(non_target) >= count:
-                candidates = non_target
+        if attack in {"targeted_label_flip", "blended_injection"}:
+            if attack == "targeted_label_flip":
+                candidates = candidates[labels == source_label]
+            else:
+                candidates = candidates[labels != target_label]
+            if count > len(candidates):
+                raise ValueError("poison_count exceeds eligible source samples")
         poisoned_indices = np.sort(rng.choice(candidates, size=count, replace=False))
         is_poisoned = np.zeros(len(labels), dtype=bool)
         is_poisoned[poisoned_indices] = True
         current = labels.copy()
         if attack == "label_flip":
             current[is_poisoned] = (current[is_poisoned] + 1) % 10
+        elif attack == "targeted_label_flip":
+            current[is_poisoned] = target_label
         elif attack in {"backdoor", "blended_injection"}:
             current[is_poisoned] = target_label
         self.metadata = PoisonMetadata(
@@ -94,6 +106,7 @@ class PoisonedImageDataset:
         clone = object.__new__(PoisonedImageDataset)
         clone.dataset = self.dataset
         clone.attack = self.attack
+        clone.source_label = self.source_label
         clone.target_label = self.target_label
         clone.blend_alpha = self.blend_alpha
         clone._noise_seed = self._noise_seed
@@ -123,6 +136,7 @@ def poison_dataset(
     attack: str,
     *,
     poison_rate: float = 0.05,
+    source_label: int | None = None,
     target_label: int = 0,
     blend_alpha: float = 0.10,
     poison_count: int | None = None,
@@ -132,6 +146,7 @@ def poison_dataset(
         dataset,
         attack=attack,
         poison_rate=poison_rate,
+        source_label=source_label,
         target_label=target_label,
         blend_alpha=blend_alpha,
         poison_count=poison_count,
@@ -145,25 +160,38 @@ def poison_texts(
     *,
     attack: str,
     poison_rate: float = 0.05,
+    source_label: int | None = None,
     target_label: int = 1,
     trigger: str = "excellent cinematic signal",
     seed: int = 0,
 ) -> tuple[list[str], np.ndarray, dict[str, np.ndarray]]:
     """Apply label-flip or phrase-trigger poisoning to text rows."""
-    if attack not in {"label_flip", "backdoor"}:
-        raise ValueError("attack must be 'label_flip' or 'backdoor'")
+    if attack not in {"label_flip", "targeted_label_flip", "backdoor"}:
+        raise ValueError("unsupported text attack")
+    if attack == "targeted_label_flip":
+        if source_label is None:
+            raise ValueError("source_label is required for targeted_label_flip")
+        if source_label == target_label:
+            raise ValueError("source_label and target_label must differ")
     if not 0 <= poison_rate <= 1:
         raise ValueError("poison_rate must be between 0 and 1")
     original = np.asarray(labels, dtype=np.int64)
     rng = np.random.default_rng(seed)
     count = int(round(len(original) * poison_rate))
-    selected = np.sort(rng.choice(len(original), size=count, replace=False))
+    candidates = np.arange(len(original))
+    if attack == "targeted_label_flip":
+        candidates = candidates[original == source_label]
+        if count > len(candidates):
+            raise ValueError("poison_rate selects more rows than the source class contains")
+    selected = np.sort(rng.choice(candidates, size=count, replace=False))
     poisoned = np.zeros(len(original), dtype=bool)
     poisoned[selected] = True
     current = original.copy()
     result_texts = list(texts)
     if attack == "label_flip":
         current[poisoned] = 1 - current[poisoned]
+    elif attack == "targeted_label_flip":
+        current[poisoned] = target_label
     else:
         current[poisoned] = target_label
         result_texts = [

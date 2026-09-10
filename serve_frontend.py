@@ -30,8 +30,8 @@ class FeatureHandler(SimpleHTTPRequestHandler):
         if self.path == "/api/datasets":
             self._json({
                 "datasets": ["cifar10", "mnist", "imdb"],
-                "attacks": ["none", "label_flip", "backdoor", "blended_injection"],
-                "text_attacks": ["none"],
+                "attacks": ["none", "label_flip", "targeted_label_flip", "backdoor", "blended_injection"],
+                "text_attacks": ["none", "label_flip", "targeted_label_flip", "backdoor"],
             })
             return
         if self.path.startswith("/api/jobs/"):
@@ -109,6 +109,8 @@ def run_extraction(job_id: str, request: dict) -> None:
         if encoder not in {"resnet18", "dinov2"}:
             raise ValueError("encoder must be 'resnet18' or 'dinov2'")
         poison_rate = float(request.get("poison_rate", 0.05))
+        source_label = request.get("source_label")
+        source_label = None if source_label is None else int(source_label)
         target_label = int(request.get("target_label", 0))
         blend_alpha = float(request.get("blend_alpha", 0.10))
         poison_count = request.get("poison_count")
@@ -122,7 +124,10 @@ def run_extraction(job_id: str, request: dict) -> None:
         artifacts.mkdir(exist_ok=True)
         size_key = "full" if full_training else str(limit)
         rate_key = f"{poison_rate:.2f}".replace(".", "")
-        attack_key = f"{attack}-a{blend_alpha:.2f}-t{target_label}-n{poison_count or 'rate'}"
+        attack_key = (
+            f"{attack}-s{source_label if source_label is not None else 'na'}"
+            f"-a{blend_alpha:.2f}-t{target_label}-n{poison_count or 'rate'}"
+        )
         update_job(job_id, status="running", progress=2, message="Loading dataset")
         if name == "imdb":
             stem = f"{name}-{split}-{size_key}-minilm-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
@@ -149,6 +154,8 @@ def run_extraction(job_id: str, request: dict) -> None:
                 texts, labels, metadata = poison_texts(
                     texts, labels, attack=attack,
                     poison_rate=poison_rate,
+                    source_label=source_label,
+                    target_label=target_label,
                     seed=int(request.get("seed", 0)),
                 )
             update_job(job_id, progress=15, message=f"Encoding {total:,} reviews with MiniLM")
@@ -175,6 +182,7 @@ def run_extraction(job_id: str, request: dict) -> None:
                 dataset, attack,
                 poison_rate=poison_rate,
                 target_label=target_label,
+                source_label=source_label,
                 blend_alpha=blend_alpha,
                 poison_count=poison_count,
                 seed=int(request.get("seed", 0)),
@@ -198,7 +206,7 @@ def run_extraction(job_id: str, request: dict) -> None:
             attack_stem = f"{name}-{split}-{size_key}-{encoder_key}-{attack_key}-seed{int(request.get('seed', 0))}"
             feature_path = artifacts / f"{attack_stem}-features.npz"
             image_path = artifacts / f"{attack_stem}-images.npz"
-            if attack == "label_flip" and clean_feature_path.exists():
+            if attack in {"label_flip", "targeted_label_flip"} and clean_feature_path.exists():
                 base = FeatureBundle.load(clean_feature_path)
                 bundle = FeatureBundle(
                     features=base.features,

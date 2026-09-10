@@ -210,9 +210,24 @@ shows a sample-count field for fast checks. **Whole training split** removes
 that field and processes every row in the selected training split; there is no
 hidden sample limit in this mode.
 For experiments, choose **Clean**, **1%**, **3%**, **5%**, or **10%** poisoning
-for label flipping, the backdoor patch, or blended noise injection. Clean runs
-have no poisoned rows; attack metadata remains evaluation-only and is not
-included in detector inputs.
+for random label flipping, targeted label flipping, the backdoor patch, or
+blended noise injection. Clean runs have no poisoned rows; attack metadata
+remains evaluation-only and is not included in detector inputs.
+
+### Random and targeted label flips
+
+**Random label flip** changes the labels of a reproducibly selected set of rows
+to the next class (`(label + 1) % 10`) without changing image pixels or text.
+**Targeted label flip** adds two controls: a source class and a target class.
+Only rows whose original label equals the source class are eligible, and the
+selected rows receive the target label. The source and target must differ.
+Both attacks reuse clean embeddings and pixels because they change labels only;
+their `original_labels`, `is_poisoned`, and `poison_type` fields remain
+evaluation-only.
+
+The UI exposes these as separate attack choices named **Random label flip** and
+**Targeted label flip**. The targeted mode shows source and target label
+controls. The API names are `label_flip` and `targeted_label_flip`.
 
 ### Blended injection experiment
 

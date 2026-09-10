@@ -4,8 +4,11 @@ function updateAttackOptions() {
   $('encoder-control').hidden = !imageDataset;
   $('attack').disabled = false;
   $('poison-rate').disabled = $('attack').value === 'none';
+  const targeted = $('attack').value === 'targeted_label_flip';
   const blended = $('attack').value === 'blended_injection';
-  $('target-control').hidden = !blended;
+  const targetRequired = targeted || blended || $('attack').value === 'backdoor';
+  $('source-control').hidden = !targeted;
+  $('target-control').hidden = !targetRequired;
   $('alpha-control').hidden = !blended;
   $('status').textContent = $('dataset').value === 'imdb'
     ? 'IMDB uses MiniLM; text attacks add labels or a phrase trigger.'
@@ -44,6 +47,7 @@ $('extract').onclick = async () => {
         limit: Number($('limit').value),
         attack: $('attack').value,
         poison_rate: Number($('poison-rate').value),
+        source_label: Number($('source-label').value),
         target_label: Number($('target-label').value),
         blend_alpha: Number($('blend-alpha').value)
       })
