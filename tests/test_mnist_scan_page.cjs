@@ -12,7 +12,7 @@ vm.runInNewContext(code,{document:{getElementById:id=>nodes[id]||(nodes[id]=elem
     {status:'complete',message:'Done',progress:100,result} : {saved:0,unreviewed:3,keep:0,quarantine:0,unsure:0}})});
 setImmediate(()=>{
   assert(nodes['scan-summary'].textContent.includes('MNIST'));
-  assert(nodes['scan-description'].textContent.includes('pixels'));
+  assert(nodes['scan-description'].textContent.includes('repeated bright patches'));
   assert.equal(nodes['prepare-training'].hidden,false);
   assert.equal(nodes['prepare-training'].target,'_blank');
   assert(nodes['prepare-training'].href.includes('dataset=mnist'));

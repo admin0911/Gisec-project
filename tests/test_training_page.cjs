@@ -8,13 +8,14 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
 async function page({poisoned=3, removed=9, caught=2, available=true, statuses=[],search='?version=v&scan=s&run=r',saved=null,entry=null}={}) {
   const nodes = {}, timers = [], requests = [];
   const element = () => ({hidden:true,disabled:false,textContent:'',value:'5',children:[],listeners:{},
+    setAttribute(name,value){this[name]=value},
     addEventListener(name,fn){this.listeners[name]=fn},replaceChildren(){this.children=[]},appendChild(c){this.children.push(c)}});
   for (const match of html.matchAll(/id="([^"]+)"/g)) nodes[match[1]]=element();
   const completed = {version:'v',status:'complete',progress:100,message:'Complete',result:{
     runs:{clean_reference:{metrics:{accuracy:.8}},before_cleaning:{metrics:{accuracy:.6}},after_cleaning:{metrics:{accuracy:.7}}}}};
   const storage = new Map(saved ? [['poison-guard-training',JSON.stringify(saved)]] : []);
   const history = {state:entry,address:null,replaceState(state,_,url){this.state=state;this.address=url}};
-  const context = {document:{getElementById:id=>nodes[id],createElement:element},URLSearchParams,
+  const context = {document:{getElementById:id=>nodes[id],createElement:element,createElementNS:()=>element()},URLSearchParams,
     location:{search},history,sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},setTimeout:fn=>timers.push(fn),
     fetch:async (url,options) => {
       requests.push({url,body:JSON.parse(options.body)});
@@ -51,6 +52,19 @@ async function page({poisoned=3, removed=9, caught=2, available=true, statuses=[
   const comparison = matrix => ({version:'v',status:'complete',progress:100,message:'Complete',result:{
     runs:{before_cleaning:{metrics:{accuracy:.7,confusion_matrix:matrix}},
       after_cleaning:{metrics:{accuracy:.7,confusion_matrix:matrix}}}}});
+  // Leila: a recorded validation history produces both curves and readable values.
+  const curves=comparison([[8,2],[1,1]]);
+  curves.result.runs.after_cleaning.backdoor_metrics={untriggered_target_rate:.1,asr_non_target:.2};
+  curves.result.runs.after_cleaning.history=[{epoch:1,loss:.8,validation_loss:.9,validation_accuracy:.6},{epoch:2,loss:.5,validation_loss:.7,validation_accuracy:.7}];
+  curves.result.runs.after_cleaning.training_samples=900;curves.result.runs.after_cleaning.validation_samples=100;curves.result.runs.after_cleaning.test_samples=1000;
+  p=await page({statuses:[curves]});
+  assert.equal(p.nodes['comparison'].hidden,false);
+  assert.equal(p.nodes['backdoor-comparison'].hidden,false);
+  assert.deepEqual(p.nodes['backdoor-rows'].children[0].children.map(c=>c.textContent),['After cleaning','10.00%','20.00%']);
+  const panel=p.nodes['learning-curve-content'].children.at(-1);
+  assert(panel.children.some(c=>c.role==='img'));
+  assert(panel.children.some(c=>c.textContent.includes('Validation: 100')));
+  assert(panel.children.at(-1).children.at(-1).textContent.includes('70.00%'));
   // Unequal class errors distinguish macro averaging from overall accuracy.
   p=await page({statuses:[comparison([[8,2],[1,1]])]});
   assert.deepEqual(p.nodes['comparison-rows'].children[1].children.map(c=>c.textContent),

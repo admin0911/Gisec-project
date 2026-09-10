@@ -14,8 +14,12 @@
     try { sessionStorage.setItem('poison-guard-training',JSON.stringify(selection)); } catch (_) {}
   }
   let knownClean = false, comparisonData = null, selectionPolicy = null;
+  // Leila: chart labels describe the original input, before cleaning.
+  const chartContext = {};
   let currentJob = null;
   const number = n => n.toLocaleString();
+  // Leila: share formatting between classification and backdoor tables.
+  const percent = value => value == null ? 'N/A' : `${(value*100).toFixed(2)}%`;
   async function api(route, data) {
     // Leila: distinguish a lost connection from a confirmed failed training run.
     let response;
@@ -31,6 +35,34 @@
   }
   // Leila: derive classification averages from saved confusion counts, including older runs.
   // Rows are true classes and columns are predictions; undefined class scores count as zero.
+  // Leila: render saved losses without inferring convergence or inventing legacy validation.
+  function renderLearningCurves(data) {
+    const host=$('learning-curve-content');host.replaceChildren();
+    for (const [key,title] of [['clean_reference','Clean reference'],['before_cleaning','Before cleaning'],['after_cleaning','After cleaning']]) {
+      const run=data.runs[key];if(!run) continue;
+      const h=run.history || [];const box=document.createElement('div');
+      const heading=document.createElement('h4');heading.textContent=title;box.appendChild(heading);
+      const note=document.createElement('p');note.textContent=`Training: ${(Number.isFinite(run.training_samples)?number(run.training_samples):"N/A")} · Validation: ${number(run.validation_samples || 0)} · Test: ${(Number.isFinite(run.test_samples)?number(run.test_samples):"N/A")}`;box.appendChild(note);
+      const values=h.flatMap(r=>[r.loss,r.validation_loss]).filter(Number.isFinite);
+      if(values.length) {
+        const ns='http://www.w3.org/2000/svg';const svg=document.createElementNS(ns,'svg');
+        svg.setAttribute('viewBox','0 0 640 220');svg.setAttribute('width','100%');svg.setAttribute('role','img');svg.setAttribute('aria-label',title+' loss by epoch');
+        const max=Math.max(...values,.001)*1.1;
+        for(const [field,color] of [['loss','#315ac1'],['validation_loss','#d88910']]) {
+          const points=h.map((r,i)=>Number.isFinite(r[field])?`${40+560*i/Math.max(h.length-1,1)},${180-150*r[field]/max}`:null).filter(Boolean);
+          const line=document.createElementNS(ns,'polyline');line.setAttribute('points',points.join(' '));line.setAttribute('stroke',color);line.setAttribute('stroke-width','2');line.setAttribute('fill','none');svg.appendChild(line);
+        }
+        for(const [x,y,text] of [[40,205,'Epoch 1'],[530,205,`Epoch ${h.length}`],[4,32,max.toFixed(2)],[20,180,'0']]) {
+          const label=document.createElementNS(ns,'text');label.setAttribute('x',x);label.setAttribute('y',y);label.setAttribute('font-size','12');label.textContent=text;svg.appendChild(label);
+        }
+        box.appendChild(svg);
+      }
+      const legend=document.createElement('p');legend.textContent='Blue: training loss · Orange: validation loss. '+(h.some(r=>Number.isFinite(r.validation_loss))?'':'Validation was not recorded for this older run.');box.appendChild(legend);
+      const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent='Epoch values';details.appendChild(summary);
+      for(const r of h) {const row=document.createElement('p');row.textContent=`Epoch ${r.epoch}: training loss ${Number(r.loss).toFixed(4)} · validation loss ${Number.isFinite(r.validation_loss)?r.validation_loss.toFixed(4):'N/A'} · validation accuracy ${Number.isFinite(r.validation_accuracy)?(100*r.validation_accuracy).toFixed(2)+'%':'N/A'}`;details.appendChild(row);}
+      box.appendChild(details);host.appendChild(box);
+    }
+  }
   function macroMetrics(metrics) {
     const matrix = metrics?.confusion_matrix;
     if (!Array.isArray(matrix) || !matrix.length || !matrix.every(row =>
@@ -49,6 +81,19 @@
   }
   function renderComparison(data) {
     comparisonData = data;
+    // Leila: keep aggregate rates distinct from seed-42 individual diagnostics.
+    if ($('benchmark-results')) {
+      $('benchmark-results').hidden=!data.benchmark;
+      $('benchmark-rows').replaceChildren();
+      if(data.benchmark) for(const [key,title] of [['clean_reference','Clean reference'],['before_cleaning','Before cleaning'],['after_cleaning','After cleaning']]) {
+        const metrics=data.benchmark.summary[key];if(!metrics) continue;
+        const row=document.createElement('tr');
+        for(const value of [title,...['accuracy','macro_f1','macro_precision','asr_non_target'].map(k=>metrics[k]?`${percent(metrics[k].mean)} ± ${(100*metrics[k].std).toFixed(2)}`:'N/A')]) {
+          const cell=document.createElement('td');cell.textContent=value;row.appendChild(cell);
+        }
+        $('benchmark-rows').appendChild(row);
+      }
+    }
     $('comparison-rows').replaceChildren();
     // Leila: older saved comparisons have no reference; never invent its accuracy.
     for (const [key,title] of [['clean_reference','Clean reference'],['before_cleaning','Before cleaning'],['after_cleaning','After cleaning']]) {
@@ -70,9 +115,27 @@
     $('accuracy-change').textContent = `Accuracy change versus ${base === 'clean_reference' ? 'clean reference' : 'before cleaning'}: ${change>=0?'+':''}${(change*100).toFixed(2)} percentage points`;
     $('comparison-note').textContent = data.limitation;
     $('comparison-file').textContent = `Saved: ${data.result_file}`;
+    // Leila: expose the clean-model trigger floor alongside before/after cleaning.
+    if ($('backdoor-comparison')) {
+      $('backdoor-rows').replaceChildren();
+      const arms=[['clean_reference','Clean reference'],['before_cleaning','Before cleaning'],['after_cleaning','After cleaning']];
+      $('backdoor-comparison').hidden=!arms.some(([key])=>data.runs[key]?.backdoor_metrics);
+      for (const [key,title] of arms) {
+        const m=data.runs[key]?.backdoor_metrics;if (!m) continue;
+        const row=document.createElement('tr');
+        for (const value of [title,percent(m.untriggered_target_rate),percent(m.asr_non_target)]) {
+          const cell=document.createElement('td');cell.textContent=value;row.appendChild(cell);
+        }
+        $('backdoor-rows').appendChild(row);
+      }
+    }
+    if ($('learning-curve-content')) renderLearningCurves(data);
+    // Leila: render charts from this saved result, without running training again.
+    if (typeof TrainingCharts !== 'undefined') TrainingCharts.render(data, macroMetrics, data.before_cleaning_skipped || knownClean, chartContext);
     $('comparison').hidden = false;
   }
   async function poll(job, failures = 0) {
+    if ($('training-mode')) $('training-mode').disabled=true;
     currentJob = job; $('check-training').hidden = true;
     active = true; $('train').disabled = true; $('epochs').disabled = true; $('training-progress').hidden = false;
     try {
@@ -81,7 +144,7 @@
       $('training-status').textContent = data.message;
       $('training-progress').value = data.progress;
       if (data.status==='error') throw new Error(data.message);
-      if (data.status==='complete') { renderComparison(data.result); active=false; $('train').disabled=false; $('epochs').disabled=false; return; }
+      if (data.status==='complete') { renderComparison(data.result); active=false; $('train').disabled=false; $('epochs').disabled=false; if ($('training-mode')) $('training-mode').disabled=false; return; }
       setTimeout(() => poll(job),1000);
     } catch(error) {
       if (error.retryable) {
@@ -95,7 +158,7 @@
         return;
       }
       $('training-status').textContent = `Training stopped: ${error.message}`;
-      active=false; $('train').disabled=false; $('epochs').disabled=false;
+      active=false; $('train').disabled=false; $('epochs').disabled=false; if ($('training-mode')) $('training-mode').disabled=false;
     }
   }
   $('check-training').addEventListener('click',() => { if (currentJob) poll(currentJob); });
@@ -104,6 +167,7 @@
     try {
       const data = await api('evaluation',{version});
       if (!data.available) { $('evaluation-status').textContent=`Evaluation unavailable: ${data.reason}`; return; }
+      chartContext.poisonPercent = data.original.total > 0 ? 100 * data.original.poisoned / data.original.total : null;
       knownClean = data.original.poisoned === 0;
       if (knownClean && !mnist && !imdb) $('training-description').textContent='For this clean input, compare two fresh models: clean reference and after cleaning. The duplicate before-cleaning run is skipped when its images and labels match the reference.';
       if (comparisonData && !active) renderComparison(comparisonData);
@@ -143,7 +207,7 @@
     if (active) return;
     active=true; comparisonData=null; $('train').disabled=true; $('comparison').hidden=true;
     try {
-      const job = await api('start',{version,epochs:Number($('epochs').value)});
+      const job = await api('start',{version,epochs:Number($('epochs').value),mode:$('training-mode')?.value || 'quick'});
       runId = job.job_id; rememberTraining();
       poll(job.job_id);
     } catch(error) { $('training-status').textContent=error.message; active=false; $('train').disabled=false; }
@@ -152,7 +216,8 @@
     try {
       rememberTraining();
       if (!version && !scan) {
-        $('preparation-status').textContent='Choose Prepare training dataset from a completed scan first.';
+        // Leila: match the updated scan-page button label.
+        $('preparation-status').textContent='Choose Prepare dataset & view results from a completed scan first.';
         $('back-results').href='/'; $('back-results').textContent='← Prepare dataset';
         return;
       }
@@ -160,6 +225,7 @@
       mnist = data.dataset === 'mnist' || mnist;
       imdb = data.dataset === 'imdb' || imdb;
       context.dataset = imdb ? 'imdb' : mnist ? 'mnist' : 'cifar10';
+      chartContext.dataset=context.dataset; chartContext.attack=data.attack;
       selectionPolicy=data.policy_version;
       version=data.version; scan=data.scan_id; rememberTraining();
       // Leila: the same controls now train MNIST using its separate test split.

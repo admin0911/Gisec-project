@@ -32,5 +32,5 @@ class MNISTTrainingTests(unittest.TestCase):
             with patch.object(web,'ARTIFACTS',root),patch.object(web,'load_preparation',return_value=manifest),patch.object(web,'load_image_dataset',side_effect=load):
                 result=web.train_comparison('test',1,root/'output',lambda *args:None)
             self.assertEqual(result['status'],'complete')
-            self.assertEqual([r['training_samples'] for r in result['runs'].values()],[10,10,9])
+            self.assertEqual([r['training_samples'] for r in result['runs'].values()],[9,9,8])
             self.assertEqual(result['dataset'],'mnist')

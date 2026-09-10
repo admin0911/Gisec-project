@@ -8,13 +8,14 @@ const MNIST_PIXELS_ONLY = true;
 function updateAttackOptions() {
   // Leila: keep the shared encoder request, but hide its selector for MNIST pixel scanning.
   $('encoder-control').hidden = true;
-  // Leila: text scanning supports clean reviews and label flips.
+  // Leila: enable the verified phrase-backdoor build for IMDB.
   const textDataset = $('dataset').value === 'imdb';
   for (const option of $('attack').options) {
-    option.hidden = textDataset && !['none','label_flip'].includes(option.value);
+    option.hidden = textDataset && !['none','label_flip','backdoor'].includes(option.value);
     option.disabled = option.hidden;
+    if (option.value === 'backdoor') option.textContent = textDataset ? 'Backdoor phrase' : 'Backdoor patch';
   }
-  if (textDataset && !['none','label_flip'].includes($('attack').value)) $('attack').value='none';
+  if (textDataset && !['none','label_flip','backdoor'].includes($('attack').value)) $('attack').value='none';
   $('attack').disabled = false;
   $('poison-rate').disabled = $('attack').value === 'none';
   const blended = $('attack').value === 'blended_injection';

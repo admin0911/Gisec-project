@@ -23,8 +23,9 @@ def training_input(dataset, sample_ids, *, dataset_version, split):
         raise ValueError('Nonempty dataset with one unique ID per row required')
     if not isinstance(dataset_version, str) or not dataset_version.strip():
         raise ValueError('Record the dataset version')
-    if split not in ('train', 'test'):
-        raise ValueError('split must be train or test')
+    # Leila: validation uses the same aligned connector with an explicit split.
+    if split not in ('train', 'validation', 'test'):
+        raise ValueError('split must be train, validation or test')
     if hasattr(dataset, 'sample_ids') and not np.array_equal(dataset.sample_ids, ids):
         raise ValueError('IDs must match the dataset view order')
     ids = ids.copy()

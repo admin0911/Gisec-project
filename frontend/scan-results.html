@@ -18,7 +18,8 @@
   <div class="scan-progress-panel">
   <p id="scan-status" role="status" aria-live="polite">Loading scan…</p>
   <progress id="scan-progress" value="0" max="100" aria-label="Scan progress"></progress>
-  <p class="help">Full scans can take several minutes. You can leave this page and return while the server is running.</p>
+  <!-- Leila: Keep the scan timing hint concise. -->
+  <p class="help">Full scans can take several minutes.</p>
   </div>
   <section id="scan-result" hidden>
     <p id="scan-summary"></p>
@@ -45,6 +46,15 @@
         <article class="suspected"><span>Poisoned data</span><strong>—</strong><p>This detector does not confirm poisoning. Flagged samples appear under Needs review.</p></article>
       </div>
     </section>
+    <!-- Leila: show text backdoor findings separately from label-flip votes. -->
+    <section id="phrase-results" hidden><h2>Backdoor findings · Repeated phrases</h2>
+      <!-- Leila: match image backdoor cards while preserving review-only phrase findings. -->
+      <div class="assessment-grid">
+        <article class="clean"><span>Clean</span><strong id="phrase-not-flagged"></strong><p>No suspicious repeated phrase was flagged. This does not guarantee clean data.</p></article>
+        <article class="uncertain"><a id="review-phrases" class="review-card" href="#"><span>Needs review</span><strong id="phrase-needs-review"></strong><p>These reviews match a suspicious repeated phrase. Review is needed.</p></a></article>
+        <article class="suspected"><span>Poisoned data</span><strong>—</strong><p>This detector does not confirm poisoning. Flagged reviews appear under Needs review.</p></article>
+      </div>
+    </section>
     <!-- Leila: review is optional and appears only once scan results are ready. -->
     <p><a id="human-review" class="review-primary" href="#">Human review →</a></p>
     <!-- Leila: show saved human choices below the review button, separate from detector counts. -->
@@ -68,8 +78,11 @@
     <details id="patch-details" hidden><summary>More information · Backdoor patches and sample findings</summary>
       <div id="patch-patterns"></div><div id="patch-examples"></div>
     </details>
+    <!-- Leila: place phrase evidence alongside the other expandable detector details. -->
+    <details id="phrase-details" hidden><summary>More information · Backdoor phrases and sample findings</summary><div id="phrase-patterns"></div></details>
     <!-- Leila: continue to training preparation after the completed scan and optional review. -->
-    <p style="margin-top:28px"><a id="prepare-training" class="review-primary" href="#">Prepare training dataset →</a></p>
+    <!-- Leila: describe both preparation and the results destination. -->
+    <p style="margin-top:28px"><a id="prepare-training" class="review-primary" href="#">Prepare dataset &amp; view results →</a></p>
   </section>
 <!-- Leila: refresh the results controller to show current saved reviews after returning. -->
-</main><!-- Leila: use the short human review links. --><script src="/scan-results.js?v=combined-review"></script></body></html>
+</main><!-- Leila: use the short human review links. --><script src="/scan-results.js?v=imdb-training"></script></body></html>

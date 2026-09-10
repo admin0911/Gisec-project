@@ -12,7 +12,7 @@ vm.runInNewContext(code,{document:{getElementById:id=>nodes[id]||(nodes[id]=elem
     {status:'complete',message:'Done',progress:100,result} : {saved:0,unreviewed:3,keep:0,quarantine:0,unsure:0}})});
 setImmediate(()=>{
   assert(nodes['scan-summary'].textContent.includes('IMDB'));
-  assert(nodes['scan-description'].textContent.includes('MiniLM'));
+  assert(nodes['scan-description'].textContent.includes('label flipping in review text'));
   assert.equal(nodes['prepare-training'].hidden,false);
   assert.equal(nodes['human-review'].hidden,false);
 

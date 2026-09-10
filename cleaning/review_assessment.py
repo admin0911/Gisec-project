@@ -5,7 +5,8 @@ import numpy as np
 
 def review_assessment(scan):
     assessment = deepcopy(scan['assessment'])
-    patch = scan.get('patch_scan')
+    # Leila: text phrase and image patch flags use the same unresolved-review policy.
+    patch = scan.get('phrase_scan') if scan.get('dataset') == 'imdb' else scan.get('patch_scan')
     if patch is None:
         return assessment
     ids = np.asarray(assessment['sample_ids'])

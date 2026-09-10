@@ -171,10 +171,13 @@ def run_extraction(job_id: str, request: dict) -> None:
         update_job(job_id, status="running", progress=2, message="Loading dataset")
         if name == "imdb":
             # Leila: expose only implemented text scenarios in this scan flow.
-            if attack not in ("none","label_flip"): raise ValueError("IMDB supports clean or label flip in this flow.")
+            if attack not in ("none","label_flip","backdoor"): raise ValueError("Unsupported IMDB attack.")
             stem = f"{name}-{split}-{size_key}-minilm-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
+            # Leila: version phrase builds separately; use the verified neutral prefix and positive target.
+            if attack == "backdoor": stem += "-phrase-v1-positive-start"
             feature_path = artifacts / f"{stem}-features.npz"
-            if feature_path.exists():
+            text_path = artifacts / f"{stem}-texts.jsonl"
+            if feature_path.exists() and text_path.exists():
                 bundle = FeatureBundle.load(feature_path)
                 update_job(
                     job_id,
@@ -197,6 +200,7 @@ def run_extraction(job_id: str, request: dict) -> None:
                     texts, labels, attack=attack,
                     poison_rate=poison_rate,
                     seed=int(request.get("seed", 0)),
+                    **(dict(target_label=1,trigger="silver lantern",trigger_position="start",selection_policy="non_target") if attack=="backdoor" else {}),
                 )
             update_job(job_id, progress=15, message=f"Encoding {total:,} reviews with MiniLM")
             bundle = extract_text(
@@ -205,6 +209,9 @@ def run_extraction(job_id: str, request: dict) -> None:
                 is_poisoned=metadata.get("is_poisoned", np.zeros(total,dtype=bool)),
                 poison_type=metadata.get("poison_type"),
             )
+            # Leila: preserve post-attack text through the raw-text connector, without truth.
+            from poison_features.text_inputs import TextInputBundle
+            TextInputBundle(tuple(texts),np.asarray(labels),bundle.sample_ids).save(text_path)
             bundle.save(feature_path)
             update_job(job_id, progress=95, message="Preparing PCA visualization")
             result = bundle_result(bundle, feature_path, None)

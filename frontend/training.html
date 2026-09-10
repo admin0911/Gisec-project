@@ -37,7 +37,12 @@
     <h2>Train & compare</h2>
     <!-- Leila: include a clean-data benchmark without using it to make cleaning decisions. -->
     <p id="training-description" class="help">Compare clean reference and after cleaning. A before-cleaning model is also trained when the input differs from the clean reference. All use the same model, seed, epochs and separate CIFAR-10 test set.</p>
-    <label>Epochs per model <select id="epochs"><option value="1">1 · quick check</option><option value="5" selected>5</option><option value="10">10</option><option value="20">20</option></select></label>
+    <!-- Leila: separate validation allocation from the cleaning counts above. -->
+    <p class="help">New runs reserve 10% of selected IDs as clean demo validation, excluded from every model’s training. The official test set remains separate. 20 epochs is a starting budget, not a convergence guarantee.</p>
+    <label>Epochs per model <select id="epochs"><option value="1">1 · quick check</option><option value="5">5</option><option value="10">10</option><option value="20" selected>20</option></select></label>
+    <!-- Leila: benchmark reuses the preparation and varies training randomness only. -->
+    <label>Training mode <select id="training-mode"><option value="quick">Quick comparison · 1 seed</option><option value="benchmark">3-seed benchmark · equal training updates</option></select></label>
+    <p class="help">Benchmark runs seeds 42, 43 and 44. The epoch choice sets the reference model’s update budget; other models receive the same number of updates. Allow roughly three times the single-seed runtime.</p>
     <button id="train" type="button">Train & compare</button>
     <!-- Leila: MNIST uses a disabled training explanation in this same layout. -->
     <p id="training-runtime-note" class="help">Uses the CPU and can take a while on the full dataset. Keep the server running.</p>
@@ -49,11 +54,27 @@
 <progress id="training-progress" value="0" max="100" aria-label="Training progress" hidden></progress>
 <section id="comparison" hidden>
   <h2>Comparison results</h2>
+  <!-- Leila: report seed averages separately from individual seed diagnostics. -->
+  <section id="benchmark-results" hidden><h3>Three-seed benchmark · mean ± standard deviation</h3><p>Paired seeds 42, 43 and 44; equal optimizer steps. Rates are percentages; ± values are percentage points.</p><div class="table-scroll"><table><thead><tr><th>Training data</th><th>Accuracy</th><th>Macro F1</th><th>Macro precision</th><th>ASR</th></tr></thead><tbody id="benchmark-rows"></tbody></table></div><p>Individual results and loss curves below show seed 42. All three seed reports are saved.</p></section>
   <!-- Leila: compare classification metrics on the same clean test set, including saved runs. -->
   <p id="classification-note" class="help">All three metrics evaluate image classification on the separate, clean CIFAR-10 test set. Macro F1 and macro precision average equally across the 10 classes; they do not measure poison detection.</p>
+  <!-- Leila: charts reuse completed results and can be exported for reports. -->
+  <section id="result-charts" hidden aria-label="Training comparison charts">
+    <canvas id="comparison-chart" width="1200" height="540" style="width:100%;height:auto" role="img" aria-label="Training metrics; exact values are also in the results table below."></canvas>
+    <p id="chart-summary" class="help"></p>
+    <button id="download-chart" type="button">Download chart · PNG</button>
+    <p id="chart-download-status" role="status" class="help"></p>
+  </section>
   <div class="table-scroll"><table><thead><tr><th>Training data</th><th>Test accuracy</th><th>Macro F1</th><th>Macro precision</th></tr></thead><tbody id="comparison-rows"></tbody></table></div>
   <p class="help">Classes with no predicted samples have precision 0. N/A means the saved confusion matrix is unavailable or invalid.</p>
+  <!-- Leila: display trigger effects separately from clean classification accuracy. -->
+  <section id="backdoor-comparison" hidden><h3>Backdoor test · negative reviews</h3>
+    <p>How often negative test reviews are predicted Positive, without and with the trigger phrase.</p>
+    <table><thead><tr><th>Training data</th><th>Without phrase</th><th>With phrase (ASR)</th></tr></thead><tbody id="backdoor-rows"></tbody></table>
+  </section>
+  <!-- Leila: saved per-epoch histories support reviewing convergence. -->
+  <details id="learning-curves"><summary>More information · Training and validation loss</summary><div id="learning-curve-content"></div></details>
   <p id="reference-status" class="help"></p>
   <details><summary>More information · saved training results</summary><p id="accuracy-change"></p><p id="comparison-note" class="help"></p><p id="comparison-file" class="help"></p></details>
 </section>
-</main><!-- Leila: refresh the controller to show macro classification metrics. --><script src="/training.js?v=clean-retention"></script></body></html>
+</main><!-- Leila: refresh the controller to show macro classification metrics. --><script src="/training-charts.js?v=three-seeds"></script><script src="/training.js?v=three-seeds"></script></body></html>

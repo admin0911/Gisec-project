@@ -24,6 +24,11 @@ def scan_identity(paths, profile):
     for feature in paths:
         for path in ((feature,) if feature.name.startswith('imdb-train-') else (feature,feature.with_name(feature.name.replace('-features.npz','-images.npz')))):
             inputs.append((str(path.resolve()),digest_file(path)))
+    # Leila: phrase scans must invalidate when observed review text changes.
+    for feature in paths:
+        if feature.name.startswith('imdb-train-'):
+            text_path=feature.with_name(feature.name.replace('-features.npz','-texts.jsonl'))
+            if text_path.exists(): inputs.append((str(text_path.resolve()),digest_file(text_path)))
     root = Path(__file__).resolve().parents[2]
     sources = sorted((root/'detectors'/'label_flip').glob('*.py'))
     # Leila: invalidate cached image scans when patch scanning changes.
