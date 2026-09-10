@@ -7,7 +7,11 @@
   const saved = document.getElementById('saved-scan-features');
   let featureFile = null, generation = 0;
   const last = sessionStorage.getItem('label-flip-job');
-  if (last) { previous.href = `/scan?job=${encodeURIComponent(last)}`; previous.hidden = false; }
+  if (last) {
+    previous.href = `/scan?job=${encodeURIComponent(last)}`;
+    previous.textContent = 'View last label-flip scan';
+    previous.hidden = false;
+  }
   function reset() {
     generation++; featureFile = null; button.disabled = true;
     saved.value = '';

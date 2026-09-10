@@ -136,7 +136,7 @@
     get('scan-result').hidden = false;
   }
   async function poll() {
-    if (!jobId) { get('scan-status').textContent = 'Start a label-flip scan from Prepare dataset.'; get('scan-progress').hidden = true; return; }
+    if (!jobId) { get('scan-status').textContent = 'Build a blended-injection dataset for unified results, or start a label-flip scan from Prepare dataset.'; get('scan-progress').hidden = true; return; }
     try {
       const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
       if (!response.ok) throw new Error('Scan unavailable. The server may have restarted; start a new scan from Prepare dataset.');

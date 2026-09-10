@@ -175,6 +175,7 @@ def bundle_result(bundle: FeatureBundle, feature_path: Path, image_path: Path | 
         "labels": bundle.labels.tolist(),
         "poisoned": None if bundle.is_poisoned is None else int(bundle.is_poisoned.sum()),
         "poison_type": None if bundle.poison_type is None else bundle.poison_type.tolist(),
+        "attack": (bundle.metadata or {}).get("attack", "none"),
         "feature_file": str(feature_path),
         "image_file": None if image_path is None else str(image_path),
     }
