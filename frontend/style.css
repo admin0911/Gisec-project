@@ -22,3 +22,11 @@ progress { width: 100%; height: 1.2rem; accent-color: #72e6c2; }
 .diagram { display: flex; flex-wrap: wrap; gap: .55rem; align-items: center; color: #72e6c2; font-weight: 700; }
 .diagram b { color: #f2c879; }
 .help { color: #abb6c9; line-height: 1.5; }
+.scan-controls { margin: 1.5rem 0; padding: 1.2rem; border: 1px solid #34415a; border-radius: 16px; background: #171d29cc; }
+.scan-controls label { margin-bottom: .8rem; }
+.blended-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: .7rem; margin: 1rem 0; }
+.blended-metrics div { padding: .8rem; border: 1px solid #34415a; border-radius: 10px; background: #10131a; }
+.blended-metrics span { color: #abb6c9; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
+.blended-metrics strong { display: block; margin-top: .35rem; font-size: 1.35rem; color: #72e6c2; }
+#blended-chart { margin-top: 1rem; }
+@media (max-width: 600px) { .blended-metrics { grid-template-columns: 1fr; } }

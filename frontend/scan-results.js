@@ -60,6 +60,12 @@
     get('not-flagged').textContent = number(data.summary.not_flagged);
     get('uncertain').textContent = number(data.summary.uncertain);
     get('suspected').textContent = number(data.summary.suspected_label_flip);
+    const total = Math.max(1, data.samples);
+    requestAnimationFrame(() => {
+      get('bar-clean').style.width = `${data.summary.not_flagged / total * 100}%`;
+      get('bar-uncertain').style.width = `${data.summary.uncertain / total * 100}%`;
+      get('bar-suspected').style.width = `${data.summary.suspected_label_flip / total * 100}%`;
+    });
     for (const row of data.detectors) {
       const tr = document.createElement('tr');
       for (const value of [names[row.encoder], names[row.detector], number(row.flagged), `${(row.rate*100).toFixed(2)}%`, row.threshold_label || `> ${row.threshold.toFixed(4)}`]) {

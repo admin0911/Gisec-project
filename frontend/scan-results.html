@@ -22,6 +22,14 @@
   </div>
   <section id="scan-result" hidden>
     <p id="scan-summary"></p>
+    <section class="visual-summary" aria-label="Assessment visualization">
+      <h2>Assessment overview</h2>
+      <div class="assessment-bars">
+        <div><span>Clean</span><b id="bar-clean"></b></div>
+        <div><span>Needs review</span><b id="bar-uncertain"></b></div>
+        <div><span>Suspected</span><b id="bar-suspected"></b></div>
+      </div>
+    </section>
     <!-- Leila: text benchmark truth is shown only after scanning. -->
     <p id="imdb-evaluation" class="help" hidden></p>
     <!-- Leila: these cards describe label-flip results only. -->

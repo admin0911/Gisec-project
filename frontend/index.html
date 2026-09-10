@@ -59,6 +59,13 @@
         <div id="blended-result" hidden>
           <strong id="blended-summary"></strong>
           <p id="blended-details" class="help"></p>
+          <div class="blended-metrics">
+            <div><span>Target class</span><strong id="blended-target">—</strong></div>
+            <div><span>Flagged samples</span><strong id="blended-flagged">0</strong></div>
+            <div><span>Class contrast</span><strong id="blended-contrast">0.00</strong></div>
+          </div>
+          <canvas id="blended-chart" width="720" height="220" aria-label="Blended detector class contrast chart"></canvas>
+          <p class="help">The chart compares residual contrast across classes. The animated scan line is a visual aid, not additional detector evidence.</p>
           <div id="blended-examples"></div>
         </div>
       </section>

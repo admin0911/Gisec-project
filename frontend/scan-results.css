@@ -27,6 +27,14 @@ progress::-moz-progress-bar { background: #3565df; border-radius: 12px; }
 .help { font-size: .86rem; color: #5b6b81; line-height: 1.65; }
 .scan-progress-panel .help { margin: 12px 0 0; }
 #scan-summary { font-size: .9rem; font-weight: 600; color: #526179; margin: 0 0 18px; }
+.visual-summary { margin: 0 0 28px; padding: 20px 24px; border: 1px solid #dfe5ed; border-radius: 12px; background: #fff; }
+.visual-summary h2 { margin-bottom: 14px; }
+.assessment-bars { display: grid; gap: 10px; }
+.assessment-bars div { display: grid; grid-template-columns: 130px 1fr; align-items: center; gap: 12px; color: #53637b; font-size: .82rem; }
+.assessment-bars b { display: block; width: 0; height: 12px; border-radius: 99px; transition: width 900ms ease-out; }
+#bar-clean { background: #2b956d; }
+#bar-uncertain { background: #d99421; }
+#bar-suspected { background: #d45c67; }
 .assessment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 article { border: 1px solid #dfe5ed; border-top: 3px solid #8a9ab1; border-radius: 12px; padding: 24px; background: #fff; box-shadow: 0 3px 10px #18253e04; }
 article span { display: inline-block; color: #53637b; font-size: .65rem; font-weight: 750; letter-spacing: .085em; background: #f0f3f7; padding: 6px 8px; border-radius: 5px; }

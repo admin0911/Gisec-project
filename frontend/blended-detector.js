@@ -3,6 +3,8 @@
   const button = document.getElementById('scan-blended');
   const status = document.getElementById('blended-status');
   const result = document.getElementById('blended-result');
+  const chart = document.getElementById('blended-chart');
+  let scanning = false;
   let imageFile = '';
 
   function reset() {
@@ -27,11 +29,17 @@
     input.value = imageFile;
     button.disabled = false;
     status.textContent = 'Saved post-attack pixels are ready for Titus’s detector.';
+    if (document.getElementById('attack').value === 'blended_injection') runScan();
   });
 
   document.getElementById('dataset').addEventListener('change', reset);
   button.addEventListener('click', async () => {
-    if (!imageFile) return;
+    runScan();
+  });
+
+  async function runScan() {
+    if (!imageFile || scanning) return;
+    scanning = true;
     button.disabled = true;
     status.textContent = 'Scanning shared residual signatures…';
     try {
@@ -46,9 +54,11 @@
       render(data);
     } catch (error) {
       status.textContent = `Error: ${error.message}`;
+    } finally {
+      scanning = false;
       button.disabled = false;
     }
-  });
+  }
 
   async function waitForJob(jobId) {
     while (true) {
@@ -66,6 +76,11 @@
     const found = evidence.target_class !== null && evidence.target_class !== undefined;
     const flags = data.flags || [];
     const flagged = flags.filter(Boolean).length;
+    const contrasts = evidence.class_contrasts || {};
+    document.getElementById('blended-target').textContent = found ? evidence.target_class : 'None';
+    document.getElementById('blended-flagged').textContent = flagged.toLocaleString();
+    document.getElementById('blended-contrast').textContent = Number(evidence.contrast || 0).toFixed(2);
+    drawContrastChart(contrasts);
     document.getElementById('blended-summary').textContent = found
       ? `Target class ${evidence.target_class} identified · ${flagged} samples flagged`
       : 'No blended-injection signature identified';
@@ -85,6 +100,36 @@
     if (!flagged) examples.textContent = 'No samples were flagged.';
     result.hidden = false;
     status.textContent = 'Blended-injection scan complete.';
-    button.disabled = false;
+  }
+
+  function drawContrastChart(contrasts) {
+    if (!chart) return;
+    const ctx = chart.getContext('2d');
+    const entries = Object.entries(contrasts);
+    const max = Math.max(1, ...entries.map(([, value]) => Number(value)));
+    const width = chart.width, height = chart.height;
+    let phase = 0;
+    const started = performance.now();
+    function frame(now) {
+      phase = Math.min(1, (now - started) / 700);
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = '#10131a'; ctx.fillRect(0, 0, width, height);
+      const barWidth = entries.length ? (width - 60) / entries.length : width;
+      entries.forEach(([label, value], index) => {
+        const amount = Math.max(0, Number(value)) / max * (height - 55) * phase;
+        const x = 30 + index * barWidth + barWidth * .18;
+        const y = height - 28 - amount;
+        ctx.fillStyle = Number(label) === Number(evidenceTarget()) ? '#f2c879' : '#72e6c2';
+        ctx.fillRect(x, y, barWidth * .64, amount);
+        ctx.fillStyle = '#abb6c9'; ctx.font = '12px Segoe UI';
+        ctx.fillText(label, x + barWidth * .2, height - 10);
+      });
+      if (phase < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function evidenceTarget() {
+    return document.getElementById('blended-target').textContent;
   }
 })();
