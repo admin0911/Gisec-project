@@ -29,4 +29,9 @@ progress { width: 100%; height: 1.2rem; accent-color: #72e6c2; }
 .blended-metrics span { color: #abb6c9; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
 .blended-metrics strong { display: block; margin-top: .35rem; font-size: 1.35rem; color: #72e6c2; }
 #blended-chart { margin-top: 1rem; }
+.blended-examples { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.blended-example { margin: 0; padding: .6rem; border: 1px solid #34415a; border-radius: 10px; background: #10131a; }
+.blended-example img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; image-rendering: pixelated; border-radius: 6px; background: #07090d; }
+.blended-example figcaption { color: #abb6c9; font-size: .78rem; margin-top: .5rem; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .blended-metrics { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .blended-examples { grid-template-columns: 1fr; } }

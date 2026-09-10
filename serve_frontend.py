@@ -4,6 +4,8 @@ import json
 import os
 import threading
 import uuid
+import base64
+from io import BytesIO
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -150,6 +152,7 @@ def handle_blended_scan_request(handler: FeatureHandler) -> None:
             update_job(job_id, progress=35, message="Scanning shared residual signatures")
             result = scan_as_connector_result(pixels)
             payload = to_jsonable(result)
+            payload["top_samples"] = blended_top_samples(pixels, payload)
             payload["image_file"] = str(image_path)
             update_job(
                 job_id, status="complete", progress=100,
@@ -160,6 +163,31 @@ def handle_blended_scan_request(handler: FeatureHandler) -> None:
 
     threading.Thread(target=worker, daemon=True).start()
     handler._json({"job_id": job_id, "status": "queued"}, status=202)
+
+
+def blended_top_samples(bundle: ImageInputBundle, detector: dict, limit: int = 3) -> list[dict]:
+    """Return small previews of the highest-scoring flagged post-attack rows."""
+    from PIL import Image
+
+    scores = np.asarray(detector.get("scores", []), dtype=float)
+    flags = np.asarray(detector.get("flags", []), dtype=bool)
+    indices = np.flatnonzero(flags)
+    indices = sorted(indices.tolist(), key=lambda index: scores[index], reverse=True)[:limit]
+    previews = []
+    for index in indices:
+        pixels = np.moveaxis(
+            np.rint(bundle.images[index] * 255).clip(0, 255).astype("uint8"), 0, -1
+        )
+        if pixels.shape[-1] == 1:
+            pixels = pixels[..., 0]
+        buffer = BytesIO()
+        Image.fromarray(pixels).save(buffer, format="PNG")
+        previews.append({
+            "sample_id": str(bundle.sample_ids[index]),
+            "score": float(scores[index]),
+            "image": "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii"),
+        })
+    return previews
 
 
 def save_blended_review_record(job_id: str, bundle: ImageInputBundle, feature_file: str,
@@ -428,6 +456,10 @@ def run_extraction(job_id: str, request: dict) -> None:
                     scan_as_connector_result(ImageInputBundle.load(image_path))
                 )
             }
+            primary["detectors"]["blended_injection"]["top_samples"] = blended_top_samples(
+                ImageInputBundle.load(image_path),
+                primary["detectors"]["blended_injection"],
+            )
             primary["human_review_enabled"] = True
             primary["review_job_id"] = job_id
             save_blended_review_record(

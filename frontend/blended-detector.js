@@ -88,16 +88,32 @@
       ? '' : ` · class contrast ratio ${Number(evidence.class_ratio).toFixed(2)}`;
     document.getElementById('blended-details').textContent =
       `Contrast ${Number(evidence.contrast || 0).toFixed(3)}${ratio}. ` +
-      'Flags are detector findings for review, not proof of poisoning.';
+      (found
+        ? 'Titus identified a strong blended-injection signal; review the top candidates before quarantine.'
+        : 'No strong blended-injection signal was identified.');
     const examples = document.getElementById('blended-examples');
     examples.replaceChildren();
-    flags.forEach((flag, index) => {
-      if (!flag) return;
-      const p = document.createElement('p');
-      p.textContent = `${data.sample_ids[index]} · score ${Number(data.scores[index]).toFixed(3)}`;
-      examples.appendChild(p);
+    const top = data.top_samples || flags.map((flag, index) => flag ? {
+      sample_id: data.sample_ids[index], score: data.scores[index]
+    } : null).filter(Boolean).sort((a, b) => b.score - a.score).slice(0, 3);
+    top.forEach(sample => {
+      const card = document.createElement('figure');
+      card.className = 'blended-example';
+      if (sample.image) {
+        const image = document.createElement('img');
+        image.src = sample.image;
+        image.alt = `Top flagged candidate ${sample.sample_id}`;
+        card.appendChild(image);
+      }
+      const caption = document.createElement('figcaption');
+      caption.textContent = `${sample.sample_id} · score ${Number(sample.score).toFixed(3)}`;
+      card.appendChild(caption);
+      examples.appendChild(card);
     });
-    if (!flagged) examples.textContent = 'No samples were flagged.';
+    if (!top.length) examples.textContent = 'No samples were flagged.';
+    document.getElementById('blended-assessment').textContent = found
+      ? 'Titus identified a strong shared residual signal consistent with blended injection. Review the top candidates before quarantining.'
+      : 'No strong blended-injection signal was identified.';
     result.hidden = false;
     status.textContent = 'Blended-injection scan complete.';
   }

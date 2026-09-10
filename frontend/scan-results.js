@@ -122,7 +122,7 @@
     get('scan-summary').textContent = 'Extraction complete · applicable detectors complete';
     get('blended-pipeline-summary').textContent = evidence.target_class === null || evidence.target_class === undefined
       ? 'No blended-injection signature identified.'
-      : `Target class ${evidence.target_class} identified · ${flagged.toLocaleString()} samples flagged for review.`;
+      : `Strong blended-injection signal detected in target class ${evidence.target_class} · ${flagged.toLocaleString()} samples flagged for review.`;
     get('pipeline-target').textContent = evidence.target_class ?? 'None';
     get('pipeline-flagged').textContent = flagged.toLocaleString();
     get('pipeline-contrast').textContent = Number(evidence.contrast || 0).toFixed(2);
@@ -132,6 +132,20 @@
     const strongest = contrasts.sort((a, b) => Number(b[1]) - Number(a[1]))[0];
     get('pipeline-strongest').textContent = strongest ? strongest[0] : 'None';
     drawPipelineChart(contrasts);
+    const examples = get('pipeline-examples');
+    examples.replaceChildren();
+    (detector.top_samples || []).forEach(sample => {
+      const card = document.createElement('figure');
+      card.className = 'pipeline-example';
+      const image = document.createElement('img');
+      image.src = sample.image;
+      image.alt = `Top flagged candidate ${sample.sample_id}`;
+      const caption = document.createElement('figcaption');
+      caption.textContent = `${sample.sample_id} · score ${Number(sample.score).toFixed(3)}`;
+      card.append(image, caption);
+      examples.appendChild(card);
+    });
+    if (!detector.top_samples?.length) examples.textContent = 'No samples were flagged.';
     get('blended-pipeline-results').hidden = false;
     get('scan-result').querySelector('.visual-summary').hidden = true;
     get('review-uncertain').closest('.assessment-grid').hidden = true;
