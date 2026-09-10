@@ -3,6 +3,9 @@
 The attack blends one shared noise pattern into selected images at low opacity
 and relabels them to a target class. `residual_signature` recovers the shared
 pattern; `pipeline` runs it and returns connector-ready output.
+
+Use `scan_all_classes` when the targeted class is unknown, which is the
+realistic case; `scan_blended_injection` scores one known class.
 """
 
 from detectors.blended_injection.residual_signature import (
@@ -12,6 +15,7 @@ from detectors.blended_injection.residual_signature import (
 from detectors.blended_injection.pipeline import (
     DETECTOR_NAME,
     DETECTOR_VERSION,
+    scan_all_classes,
     scan_blended_injection,
     scan_settings,
 )
@@ -19,6 +23,7 @@ from detectors.blended_injection.pipeline import (
 __all__ = [
     "BlendedInjectionDetector",
     "flag_samples",
+    "scan_all_classes",
     "scan_blended_injection",
     "scan_settings",
     "DETECTOR_NAME",

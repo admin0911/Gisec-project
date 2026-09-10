@@ -4,6 +4,7 @@ import unittest
 import numpy as np
 from poison_features.image_inputs import ImageInputBundle
 from detectors.blended_injection import (
+    scan_all_classes,
     BlendedInjectionDetector,
     flag_samples,
     scan_blended_injection,
@@ -43,7 +44,7 @@ def _smooth_image_batch(rng, n_samples, size=32, coarse=4):
     return np.clip(images, 0.0, 1.0).astype(np.float32)
 
 
-def _make_bundle(n_samples=600, poison_rate=0.05, seed=42):
+def _make_bundle(n_samples=600, poison_rate=0.05, seed=42, target=TARGET_CLASS):
     """Synthetic ImageInputBundle carrying a blended injection attack.
 
     Mirrors the real attack: poisoned rows are drawn from non-target classes,
@@ -59,11 +60,11 @@ def _make_bundle(n_samples=600, poison_rate=0.05, seed=42):
     is_poisoned = np.zeros(n_samples, dtype=bool)
 
     if n_poison > 0:
-        candidates = np.where(labels != TARGET_CLASS)[0]
+        candidates = np.where(labels != target)[0]
         for idx in rng.choice(candidates, n_poison, replace=False):
             images[idx] = np.clip(
                 (1 - ALPHA) * images[idx] + ALPHA * trigger, 0.0, 1.0)
-            labels[idx] = TARGET_CLASS
+            labels[idx] = target
             is_poisoned[idx] = True
 
     bundle = ImageInputBundle(images=images, labels=labels, sample_ids=sample_ids)
@@ -266,3 +267,43 @@ class TestComponents(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAutomaticClassDiscovery(unittest.TestCase):
+    """On a real dataset the attacker's target is unknown and must be found."""
+
+    def test_finds_the_targeted_class(self):
+        for target in (0, 3, 7):
+            with self.subTest(target=target):
+                bundle, truth = _make_bundle(poison_rate=0.05, target=target)
+                result = scan_all_classes(bundle)
+                self.assertEqual(result["target_class"], target)
+                caught = np.sum(result["flags"] & truth)
+                self.assertGreater(caught / np.sum(truth), 0.80)
+
+    def test_clean_data_reports_no_target(self):
+        """Ten classes means ten chances to cry wolf; none may be taken."""
+        bundle, _ = _make_bundle(poison_rate=0.0)
+        result = scan_all_classes(bundle)
+        self.assertIsNone(result["target_class"])
+        self.assertEqual(int(result["flags"].sum()), 0)
+
+    def test_flags_only_the_found_class(self):
+        bundle, _ = _make_bundle(poison_rate=0.05, target=7)
+        result = scan_all_classes(bundle)
+        self.assertFalse(result["flags"][bundle.labels != 7].any())
+
+    def test_reports_every_class_score(self):
+        bundle, _ = _make_bundle(poison_rate=0.05)
+        contrasts = scan_all_classes(bundle)["class_contrasts"]
+        self.assertEqual(len(contrasts), 10)
+        self.assertTrue(all(np.isfinite(v) for v in contrasts.values()))
+
+    def test_carries_connector_required_keys(self):
+        bundle, _ = _make_bundle(poison_rate=0.05)
+        result = scan_all_classes(bundle)
+        for key in ("sample_ids", "scores", "flags"):
+            self.assertIn(key, result)
+        self.assertEqual(result["flags"].dtype, np.dtype(bool))
+        self.assertTrue(np.isfinite(result["scores"]).all())
+        np.testing.assert_array_equal(result["sample_ids"], bundle.sample_ids)
