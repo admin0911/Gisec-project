@@ -71,11 +71,14 @@ def train_comparison(version, epochs, output, progress, *, seed=42, matched_step
     test_data = load_image_dataset(dataset,root=str(ARTIFACTS.parent/'data'),train=False,download=False)
     test = training_input(test_data,[f'{dataset}-test:{i}' for i in range(len(test_data))],
                           dataset_version=f'{dataset}-official-test',split='test')
+    # Leila: verify the actual CIFAR trigger before evaluating any trained arm.
+    from .image_backdoor import patch_specification, add_patch_metrics
+    patch_spec = patch_specification(manifest, images, reference.dataset)
     config = TrainConfig(epochs=epochs,batch_size=128,seed=seed,device='cpu')
     report = dict(dataset=dataset,version=version,scan_id=manifest['scan_id'],review_revision=manifest['review_revision'],
         preparation=manifest['summary'],runs={},status='running',before_cleaning_skipped=skip_before,
         accuracy_change_reference='clean_reference' if skip_before else 'before_cleaning',
-        limitation='Clean reference uses the official clean training rows matching the input IDs, for benchmark evaluation only. Label-flip comparison, one training seed. Same epochs but filtering changes optimizer steps. Backdoor attack success is not measured here.')
+        limitation='Clean reference uses the official clean training rows matching the input IDs, for benchmark evaluation only. Label-flip comparison, one training seed. Same epochs but filtering changes optimizer steps. CIFAR patch/blended-noise ASR is evaluated when a matching attack is verified.')
     output = Path(output)
     output.mkdir(parents=True,exist_ok=True)
     # Leila: identical clean input needs only the reference and filtered models.
@@ -87,7 +90,7 @@ def train_comparison(version, epochs, output, progress, *, seed=42, matched_step
     if matched_steps:
         from dataclasses import replace
         config=replace(config,max_steps=epochs*((len(arms[0][1].dataset)+127)//128))
-        report['limitation']='Matched optimizer steps within this seed. Official clean reference is evaluation-only. Image backdoor ASR is not measured.'
+        report['limitation']='Matched optimizer steps within this seed. Official clean reference is evaluation-only. CIFAR patch/blended-noise ASR uses non-target official test images when applicable.'
     step = 90 // len(arms)
     for index,(name,inputs) in enumerate(arms):
         progress(5+index*step,f'Model {index+1} of {len(arms)}: {name.replace("_"," ")}')
@@ -97,6 +100,9 @@ def train_comparison(version, epochs, output, progress, *, seed=42, matched_step
             progress(5+index*step+min(step-2,int((step-2)*epoch/epochs)),f'Model {index+1} of {len(arms)} \u00b7 {message}')
         run = train_classifier(inputs,test,model_factory=(lambda: small_cnn(channels=1)) if dataset=='mnist' else small_cnn,model_name='small_cnn_mnist_v1' if dataset=='mnist' else 'small_cnn_v1',num_classes=10,
                                output_root=output/name,config=config,progress=update,validation=validation)
+        if patch_spec is not None:
+            progress(5+index*step+step-1, f'Evaluating CIFAR image-trigger ASR: {name}')
+            add_patch_metrics(run, test, patch_spec)
         report['runs'][name] = run
         (output/'comparison.json').write_text(json.dumps(report,indent=2,allow_nan=False),encoding='utf-8')
     report['status'] = 'complete'

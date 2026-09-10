@@ -9,8 +9,8 @@ def review_assessment(scan):
     patch = scan.get('phrase_scan') if scan.get('dataset') == 'imdb' else scan.get('patch_scan')
     ids = np.asarray(assessment['sample_ids'])
     states = None
-    # Leila: independent MNIST noise flags join review without adding label votes.
-    blended = scan.get('blended_scan') if scan.get('dataset') == 'mnist' else None
+    # Leila: both image datasets use noise flags without adding label votes.
+    blended = scan.get('blended_scan')
     for detector in (patch, blended):
         if detector is None: continue
         flags = np.asarray(detector['flags'])
@@ -18,7 +18,7 @@ def review_assessment(scan):
                 or flags.dtype.kind != 'b'):
             raise ValueError('Patch review flags must match the label-flip sample IDs')
         if states is None: states = np.asarray(assessment['assessment'], dtype='<U24').copy()
-        if detector is blended and not detector.get('evidence',{}).get('applicable',False):
+        if detector is blended and not detector.get('evidence',{}).get('applicable',True):
             continue  # Inconclusive is not evidence to keep or quarantine samples.
         states[flags & (states == 'not_flagged')] = 'uncertain'
     if states is None: return assessment

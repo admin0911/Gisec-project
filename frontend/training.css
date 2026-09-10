@@ -14,3 +14,8 @@ button:disabled, select:disabled { opacity: .5; cursor: not-allowed; }
 .evaluation-metrics p { font-size: .85rem; color: #64748b; }
 .training-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media(max-width:550px) { .training-summary { grid-template-columns: 1fr; } .training-controls label { display: flex; margin-bottom: 16px; } }
+
+/* Leila: evaluation colours indicate outcomes; row and column labels retain meaning. */
+#evaluation-rows td.outcome-good { color: #187451; font-weight: 700; }
+#evaluation-rows td.outcome-warning { color: #98600b; font-weight: 700; }
+#evaluation-rows td.outcome-danger { color: #b63c50; font-weight: 700; }

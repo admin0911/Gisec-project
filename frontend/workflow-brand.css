@@ -1,0 +1,6 @@
+/* Leila: compact branding shared by scan, review and training pages. */
+.workflow-brand-header { margin-bottom: 20px; }
+.workflow-brand { display: inline-flex; align-items: center; gap: 10px; color: #1e293b; font-size: 1.35rem; font-weight: 700; text-decoration: none; }
+.workflow-brand:hover { color: #315bbb; text-decoration: none; }
+.workflow-brand img { display: block; flex-shrink: 0; }
+.workflow-brand:focus-visible { outline: 3px solid #315bbb; outline-offset: 5px; border-radius: 4px; }

@@ -38,8 +38,10 @@ function updateWorkflowVisibility() {
   const cifar = $('dataset').value === 'cifar10';
   const labelFlip = ['label_flip', 'targeted_label_flip'].includes(attack);
   const blended = attack === 'blended_injection' && cifar;
-  $('label-flip-controls').hidden = !labelFlip;
-  $('blended-controls').hidden = !blended;
+  // Leila: saved datasets and the complete scan are available for every attack.
+  $('label-flip-controls').hidden = false;
+  // Leila: use the complete Scan dataset flow for every attack.
+  $('blended-controls').hidden = true;
   if (!blended) $('blended-result').hidden = true;
   if (!labelFlip) {
     $('last-scan').hidden = true;
@@ -124,7 +126,8 @@ $('extract').onclick = async () => {
       ? `/scan?job=${encodeURIComponent(job.job_id)}`
       : '/scan';
     $('last-scan').textContent = unifiedPipelineRun ? 'View unified results' : 'Run label-flip scan to view results';
-    $('last-scan').hidden = !unifiedPipelineRun;
+    // Leila: build-only detector results are not a complete dataset scan.
+    $('last-scan').hidden = true;
     // Leila: a pixels-only build has no encoder/PCA plot to display.
     $('result').hidden = false;
     $('plot').hidden = !!data.pixels_only;

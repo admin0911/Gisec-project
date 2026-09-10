@@ -48,7 +48,7 @@ async function page({poisoned=3, removed=9, caught=2, available=true, statuses=[
   assert.equal(p.nodes['precision-details'].hidden,false);
   // Leila: legacy runs must show unavailable metrics instead of invented zero scores.
   assert.deepEqual(p.nodes['comparison-rows'].children[0].children.map(c=>c.textContent),
-    ['Clean reference','80.00%','N/A','N/A']);
+    ['Clean reference','80.00%','N/A','N/A','N/A']);
   const comparison = matrix => ({version:'v',status:'complete',progress:100,message:'Complete',result:{
     runs:{before_cleaning:{metrics:{accuracy:.7,confusion_matrix:matrix}},
       after_cleaning:{metrics:{accuracy:.7,confusion_matrix:matrix}}}}});
@@ -61,6 +61,11 @@ async function page({poisoned=3, removed=9, caught=2, available=true, statuses=[
   assert.equal(p.nodes['comparison'].hidden,false);
   assert.equal(p.nodes['backdoor-comparison'].hidden,false);
   assert.deepEqual(p.nodes['backdoor-rows'].children[0].children.map(c=>c.textContent),['After cleaning','10.00%','20.00%']);
+  assert.equal(p.nodes['comparison-rows'].children.at(-1).children.at(-1).textContent,'20.00%');
+  assert.equal(p.nodes['backdoor-title'].textContent,'Backdoor test · IMDB phrase');
+  curves.result.dataset='cifar10';
+  p=await page({statuses:[curves]});
+  assert.equal(p.nodes['backdoor-title'].textContent,'Backdoor test · CIFAR patch');
   const panel=p.nodes['learning-curve-content'].children.at(-1);
   assert(panel.children.some(c=>c.role==='img'));
   assert(panel.children.some(c=>c.textContent.includes('Validation: 100')));
@@ -68,7 +73,7 @@ async function page({poisoned=3, removed=9, caught=2, available=true, statuses=[
   // Unequal class errors distinguish macro averaging from overall accuracy.
   p=await page({statuses:[comparison([[8,2],[1,1]])]});
   assert.deepEqual(p.nodes['comparison-rows'].children[1].children.map(c=>c.textContent),
-    ['Before cleaning','70.00%','62.11%','61.11%']);
+    ['Before cleaning','70.00%','62.11%','61.11%','N/A']);
   assert.equal(p.nodes['comparison-rows'].children[0].children[2].textContent,'Not run');
   p=await page({statuses:[comparison([[2,0],[2,0]])]});
   assert.equal(p.nodes['comparison-rows'].children[1].children[2].textContent,'33.33%');

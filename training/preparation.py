@@ -87,8 +87,10 @@ def load_preparation(version):
 
 def preparation_summary(data):
     # Leila: identify the saved build for chart filenames; unknown legacy builds stay unknown.
+    from dataset_info import describe_dataset
+    info = describe_dataset(data.get('source_images',''), data['summary']['total'])
     source_name = Path(data.get('source_images','')).name
     attack = next((kind for kind in ('label_flip','backdoor','blended','none') if f'-{kind}-' in source_name), 'unknown')
     # Leila: expose the frozen policy so older training runs keep accurate captions.
     return dict({key:data[key] for key in ('version','scan_id','created_at','dataset','summary','review_revision','class_counts')},
-                policy_version=data.get('policy_version','1.0'), attack=attack)
+                policy_version=data.get('policy_version','1.0'), attack=info['attack'] if 'attack' in info else attack, dataset_info=info)

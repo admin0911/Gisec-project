@@ -17,7 +17,7 @@ class ScanCacheTests(unittest.TestCase):
         for target,name,value in [(web_scan,'ARTIFACTS',self.root),(web_scan,'feature_pair',lambda _:self.paths)]:
             p=patch.object(target,name,value); p.start(); self.addCleanup(p.stop)
         self.job='a'*32; self.out=self.root/'label_flip_scans'/self.job
-        self.out.mkdir(parents=True); (self.out/'results.json').write_text('{}')
+        self.out.mkdir(parents=True); (self.out/'results.json').write_text('{"blended_scan":{},"ui_result":{"blended_scan":{}}}')
         self.identity=scan_cache.scan_identity(self.paths,web_scan.web_profile())
         scan_cache.save_cache_record(self.out,self.identity)
 
@@ -26,6 +26,11 @@ class ScanCacheTests(unittest.TestCase):
         (self.out/'human_review.json').write_text('{"revision":3}')
         self.assertEqual(scan_cache.find_cached_scan('input'),self.job)
         self.assertEqual((self.out/'human_review.json').read_text(),'{"revision":3}')
+
+    def test_matching_hash_without_noise_stage_is_not_reused(self):
+        (self.out/'results.json').write_text('{}')
+        scan_cache.save_cache_record(self.out,self.identity)
+        self.assertIsNone(scan_cache.find_cached_scan('input'))
 
     def test_each_changed_input_invalidates_even_with_same_filename(self):
         for feature in self.paths:

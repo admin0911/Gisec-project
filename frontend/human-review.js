@@ -54,7 +54,7 @@
       // Leila: distinguish text evidence from visual patches.
       if (item.phrase_flagged) votes.textContent += ' · Repeated phrase flagged';
       // Leila: explain consensus-only review entries.
-      if (item.blended_flagged) votes.textContent += ' · Consensus-pixel anomaly flagged';
+      if (item.blended_flagged) votes.textContent += ' · Blended-injection anomaly flagged';
       if (item.patch_flagged) votes.textContent += ' · Repeated patch flagged';
       const field = document.createElement('fieldset'), legend = document.createElement('legend'); legend.textContent = 'Your decision'; field.appendChild(legend);
       for (const [value,text] of [['keep','Keep'],['quarantine','Quarantine'],['unsure','Unsure']]) {

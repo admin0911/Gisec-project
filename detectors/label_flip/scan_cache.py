@@ -33,8 +33,8 @@ def scan_identity(paths, profile):
     sources = sorted((root/'detectors'/'label_flip').glob('*.py'))
     # Leila: invalidate cached image scans when patch scanning changes.
     sources += sorted((root/'detectors'/'backdoor').glob('*.py'))
-    # Leila: MNIST cached results must include the current consensus detector.
-    if any(p.name.startswith('mnist-') for p in paths):
+    # Leila: both image datasets bind cached noise results to the current implementation.
+    if any(not p.name.startswith('imdb-') for p in paths):
         sources += sorted((root/'detectors'/'blended_injection').glob('*.py'))
     sources += [root/'detectors'/'output_connector.py']
     sources += sorted((root/'poison_features').glob('*.py'))
@@ -78,6 +78,13 @@ def find_cached_scan(feature_file):
             result = path.with_name('results.json')
             if (record['identity'] == identity and result.is_file()
                     and digest_file(result) == record['result_sha256']):
+                # Leila: old running servers can stamp new code hashes on incomplete scans.
+                # Check the saved stages as well as the cache identity.
+                saved = json.loads(result.read_text(encoding='utf-8'))
+                if not paths[0].name.startswith('imdb-train-'):
+                    if ('blended_scan' not in saved or
+                            'blended_scan' not in saved.get('ui_result', {})):
+                        continue
                 return path.parent.name
         except (OSError,ValueError,KeyError,TypeError):
             continue

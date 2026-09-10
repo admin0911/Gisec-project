@@ -47,7 +47,12 @@ def start_training(version,epochs,mode="quick"):
     validate_epochs(epochs)
     load_preparation(version)
     if not RUN_LOCK.acquire(blocking=False):
-        raise ValueError('A training comparison is already running. Wait for it to finish.')
+        # Leila: let the page follow the existing run instead of hiding its progress.
+        with JOBS_LOCK:
+            running = next((dict(job) for job in JOBS.values() if job['status'] in ('queued', 'running')), None)
+        if running is not None:
+            return dict(job_id=running['job_id'], version=running['version'], status=running['status'], already_running=True)
+        raise ValueError('Training is finishing. Please try again in a moment.')
     job_id = uuid.uuid4().hex
     with JOBS_LOCK:
         JOBS[job_id] = dict(job_id=job_id,version=version,status='queued',progress=0,message='Training queued')

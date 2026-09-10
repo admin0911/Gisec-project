@@ -58,17 +58,9 @@ def run(feature_path, output_dir, progress):
     # Leila: scan the same original pixels after label checks, without changing label votes.
     from detectors.backdoor.web_patch import scan_patch
     patch_result, patch_ui = scan_patch(images, assessment, progress)
-    # Leila: run MNIST background checks after patches through the same image connector.
-    from detectors.blended_injection import ConsensusPixelDetector
-    progress(6.95, 'Stage 3 of 3 · Blended-injection checks\nCheck 1 of 1 · Consensus pixels — MNIST')
-    blended_result = ConsensusPixelDetector().analyze(images)
-    evidence = blended_result['evidence']
-    selected_blended = np.flatnonzero(blended_result['flags'])
-    selected_blended = selected_blended[np.argsort(-blended_result['scores'][selected_blended], kind='stable')][:24]
-    blended_ui = dict(applicable=evidence['applicable'],status=evidence['status'],
-        flagged=int(blended_result['flags'].sum()),consensus_pixel_count=evidence['consensus_pixel_count'],
-        settings=blended_result['settings'],examples=[dict(sample_id=str(images.sample_ids[i]),
-            label=int(images.labels[i]),score=float(blended_result['scores'][i])) for i in selected_blended])
+    # Leila: use the same teammate noise connector as CIFAR after patch scanning.
+    from detectors.blended_injection.web_noise import scan_noise
+    blended_result, blended_ui = scan_noise(images, progress)
     rows = []
     for name, result in results.items():
         cutoff = '≥ 0.95 (19/20)' if name == 'knn' else '≥ 0.10' if name == 'class_distance' else 'Cleanlab pruning'

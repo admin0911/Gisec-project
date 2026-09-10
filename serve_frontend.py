@@ -75,6 +75,16 @@ class FeatureHandler(SimpleHTTPRequestHandler):
             if job is None:
                 self.send_error(404, "Unknown extraction job")
                 return
+            # Leila: attach display metadata to old and new scans without changing saved results.
+            if job.get('status') == 'complete':
+                try:
+                    from cleaning.human_review import record
+                    from dataset_info import describe_dataset
+                    _, scan_record, _ = record(job_id)
+                    info = describe_dataset(scan_record['feature_files'][0], job.get('result', {}).get('samples'))
+                    job = dict(job, result=dict(job['result'], dataset_info=info))
+                except (ValueError, OSError, KeyError, TypeError):
+                    pass
             self._json(job)
             return
         super().do_GET()

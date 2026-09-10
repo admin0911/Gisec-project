@@ -49,7 +49,9 @@ def handle_scan_request(handler, jobs, jobs_lock, update_job):
         return True
     job_id = uuid.uuid4().hex
     with jobs_lock:
-        jobs[job_id] = dict(job_id=job_id, status='queued', progress=0, message='Scan queued')
+        # Leila: keep the selected input visible while detectors are running.
+        from dataset_info import describe_dataset
+        jobs[job_id] = dict(job_id=job_id, status='queued', progress=0, message='Scan queued', dataset_info=describe_dataset(feature_file))
 
     def worker():
         try:

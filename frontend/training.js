@@ -16,7 +16,7 @@
   let knownClean = false, comparisonData = null, selectionPolicy = null;
   // Leila: chart labels describe the original input, before cleaning.
   const chartContext = {};
-  let currentJob = null;
+  let currentJob = null, watchingOtherTraining = false;
   const number = n => n.toLocaleString();
   // Leila: share formatting between classification and backdoor tables.
   const percent = value => value == null ? 'N/A' : `${(value*100).toFixed(2)}%`;
@@ -81,6 +81,12 @@
   }
   function renderComparison(data) {
     comparisonData = data;
+    // Leila: only benchmark runs collapse the duplicate single-seed tables.
+    if ($('individual-results')) {
+      $('individual-results').open = !data.benchmark;
+      $('individual-results-title').hidden = !data.benchmark;
+      $('individual-seed-note').hidden = !data.benchmark;
+    }
     // Leila: keep aggregate rates distinct from seed-42 individual diagnostics.
     if ($('benchmark-results')) {
       $('benchmark-results').hidden=!data.benchmark;
@@ -104,7 +110,7 @@
       const macro = macroMetrics(run?.metrics);
       const percent = value => value == null ? 'N/A' : `${(value*100).toFixed(2)}%`;
       for (const value of [title,run ? percent(run.metrics.accuracy) : 'Not run',
-        run ? percent(macro?.f1) : 'Not run',run ? percent(macro?.precision) : 'Not run']) {
+        run ? percent(macro?.f1) : 'Not run',run ? percent(macro?.precision) : 'Not run',run?.backdoor_metrics ? percent(run.backdoor_metrics.asr_non_target) : 'N/A']) {
         const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell);
       }
       $('comparison-rows').appendChild(row);
@@ -117,6 +123,12 @@
     $('comparison-file').textContent = `Saved: ${data.result_file}`;
     // Leila: expose the clean-model trigger floor alongside before/after cleaning.
     if ($('backdoor-comparison')) {
+      // Leila: distinguish image patch ASR from IMDB phrase ASR.
+      // Leila: label the evaluated image trigger accurately.
+      const blended = Object.values(data.runs).some(run => run.backdoor_trigger?.type === 'blended_injection');
+      const imagePatch = data.dataset === 'cifar10';
+      $('backdoor-title').textContent = blended ? 'Backdoor test · CIFAR blended noise' : imagePatch ? 'Backdoor test · CIFAR patch' : 'Backdoor test · IMDB phrase';
+      $('backdoor-description').textContent = blended ? 'How often non-target official test images are predicted as the attack target, without and with the verified blended-noise trigger.' : imagePatch ? 'How often non-target official test images are predicted as the attack target, without and with the verified patch.' : 'How often negative official test reviews are predicted Positive, without and with the trigger phrase.';
       $('backdoor-rows').replaceChildren();
       const arms=[['clean_reference','Clean reference'],['before_cleaning','Before cleaning'],['after_cleaning','After cleaning']];
       $('backdoor-comparison').hidden=!arms.some(([key])=>data.runs[key]?.backdoor_metrics);
@@ -142,10 +154,14 @@
       const data = await api('job',{job_id:job});
       if (data.version !== version) throw new Error('This training job belongs to a different prepared dataset.');
       // Leila: repair legacy separators from the server already running in memory.
-      $('training-status').textContent = String(data.message || '').replace(/\u00c2\u00b7/g, '\u00b7');
+      $('training-status').textContent = (watchingOtherTraining ? 'Another dataset is training · ' : '') + String(data.message || '').replace(/\u00c2\u00b7/g, '\u00b7');
       $('training-progress').value = data.progress;
       if (data.status==='error') throw new Error(data.message);
-      if (data.status==='complete') { renderComparison(data.result); active=false; $('train').disabled=false; $('epochs').disabled=false; if ($('training-mode')) $('training-mode').disabled=false; return; }
+      if (data.status==='complete') {
+          // Leila: never show another dataset's results under the selected dataset.
+          if (watchingOtherTraining) $('training-status').textContent='The other comparison has finished. You can now train this dataset.';
+          else renderComparison(data.result);
+          watchingOtherTraining=false; active=false; $('train').disabled=false; $('epochs').disabled=false; if ($('training-mode')) $('training-mode').disabled=false; return; }
       setTimeout(() => poll(job),1000);
     } catch(error) {
       if (error.retryable) {
@@ -176,8 +192,14 @@
       $('evaluation-rows').replaceChildren();
       for (const [key,title] of [['original','Original input'],['kept','Kept for training'],['removed','Removed from training']]) {
         const counts = data[key], row = document.createElement('tr');
-        for (const value of [title,number(counts.clean),number(counts.poisoned),number(counts.total)]) {
-          const cell = document.createElement('td'); cell.textContent=value; row.appendChild(cell);
+        // Leila: colour outcomes while keeping original counts and totals neutral.
+        for (const [column,value] of [title,number(counts.clean),number(counts.poisoned),number(counts.total)].entries()) {
+          const cell = document.createElement('td'); cell.textContent=value;
+          if (key === 'kept' && column === 1 && counts.clean > 0) cell.className='outcome-good';
+          if (key === 'kept' && column === 2) cell.className=counts.poisoned === 0 ? 'outcome-good' : 'outcome-danger';
+          if (key === 'removed' && column === 1 && counts.clean > 0) cell.className='outcome-warning';
+          if (key === 'removed' && column === 2 && counts.poisoned > 0) cell.className='outcome-good';
+          row.appendChild(cell);
         }
         $('evaluation-rows').appendChild(row);
       }
@@ -209,7 +231,8 @@
     active=true; comparisonData=null; $('train').disabled=true; $('comparison').hidden=true;
     try {
       const job = await api('start',{version,epochs:Number($('epochs').value),mode:$('training-mode')?.value || 'quick'});
-      runId = job.job_id; rememberTraining();
+      watchingOtherTraining = Boolean(job.already_running && job.version !== version);
+      if (!watchingOtherTraining) { runId = job.job_id; rememberTraining(); }
       poll(job.job_id);
     } catch(error) { $('training-status').textContent=error.message; active=false; $('train').disabled=false; }
   });
@@ -226,7 +249,11 @@
       mnist = data.dataset === 'mnist' || mnist;
       imdb = data.dataset === 'imdb' || imdb;
       context.dataset = imdb ? 'imdb' : mnist ? 'mnist' : 'cifar10';
+      // Leila: dataset-specific starting budgets; users can still choose another value.
+      $('epochs').value = imdb ? '20' : '15';
       chartContext.dataset=context.dataset; chartContext.attack=data.attack;
+      // Leila: display the original dataset configuration beside its prepared results.
+      if (data.dataset_info && $('dataset-information')) { $('dataset-information').hidden=false; $('dataset-information-text').textContent=data.dataset_info.description; }
       selectionPolicy=data.policy_version;
       version=data.version; scan=data.scan_id; rememberTraining();
       // Leila: the same controls now train MNIST using its separate test split.
