@@ -1,7 +1,20 @@
 const $ = id => document.getElementById(id);
+// Leila: edited settings invalidate progress and results from an earlier build.
+let buildRevision = 0;
+// Leila: keep the build settings fixed while the extraction request is running.
+let buildingDataset = false;
+// Leila: set false later to restore MNIST encoder extraction; the shared backend is preserved.
+const MNIST_PIXELS_ONLY = true;
 function updateAttackOptions() {
-  const imageDataset = $('dataset').value === 'mnist';
-  $('encoder-control').hidden = !imageDataset;
+  // Leila: keep the shared encoder request, but hide its selector for MNIST pixel scanning.
+  $('encoder-control').hidden = true;
+  // Leila: text scanning supports clean reviews and label flips.
+  const textDataset = $('dataset').value === 'imdb';
+  for (const option of $('attack').options) {
+    option.hidden = textDataset && !['none','label_flip'].includes(option.value);
+    option.disabled = option.hidden;
+  }
+  if (textDataset && !['none','label_flip'].includes($('attack').value)) $('attack').value='none';
   $('attack').disabled = false;
   $('poison-rate').disabled = $('attack').value === 'none';
   const targeted = $('attack').value === 'targeted_label_flip';
@@ -10,9 +23,10 @@ function updateAttackOptions() {
   $('source-control').hidden = !targeted;
   $('target-control').hidden = !targetRequired;
   $('alpha-control').hidden = !blended;
-  $('status').textContent = $('dataset').value === 'imdb'
-    ? 'IMDB uses MiniLM; text attacks add labels or a phrase trigger.'
-    : 'Ready';
+  // Leila: offer 7% for both label-flip and patch-backdoor builds.
+  const labelFlip = ['label_flip', 'targeted_label_flip', 'backdoor'].includes($('attack').value);
+  $('rate-seven').hidden = !labelFlip; $('rate-seven').disabled = !labelFlip;
+  if (!labelFlip && $('poison-rate').value === '0.07') $('poison-rate').value = '0.05';
 }
 $('dataset').onchange = updateAttackOptions;
 $('attack').onchange = updateAttackOptions;
@@ -21,6 +35,17 @@ $('scope').onchange = () => {
   $('sample-control').hidden = fullTraining;
 };
 updateAttackOptions();
+function clearBuildStatus() {
+  buildRevision++;
+  $('status').textContent = '';
+  $('progress').value = 0; $('progress').hidden = true;
+  $('progress-copy').textContent = ''; $('progress-copy').hidden = true;
+  $('result').hidden = true;
+}
+document.querySelectorAll('.controls input, .controls select').forEach(control => {
+  control.addEventListener('input',clearBuildStatus);
+  control.addEventListener('change',clearBuildStatus);
+});
 function draw(points, labels) {
   const canvas = $('plot'), ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -34,14 +59,26 @@ function draw(points, labels) {
   });
 }
 $('extract').onclick = async () => {
-  $('status').textContent = 'Starting extraction...';
+  // Leila: prevent duplicate builds and restore each control's original enabled state.
+  if (buildingDataset) return;
+  buildingDataset = true;
+  const buildControls = [...document.querySelectorAll('.controls input, .controls select')];
+  const previousDisabled = buildControls.map(control => control.disabled);
+  buildControls.forEach(control => { control.disabled = true; });
+  const revision = ++buildRevision;
+  $('status').textContent = 'Building dataset…';
+  $('result').hidden = true; $('progress').value = 0; $('progress-copy').textContent = '';
   $('progress').hidden = false; $('progress-copy').hidden = false;
   $('extract').disabled = true;
+  // Leila: only enable scanning if the form still describes this completed extraction.
+  const scanSettings = () => JSON.stringify([...document.querySelectorAll('.controls input, .controls select')].map(control => control.value));
+  const extractionSettings = scanSettings();
   try {
     const response = await fetch('/api/extract', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         dataset: $('dataset').value,
+        pixels_only: MNIST_PIXELS_ONLY && $('dataset').value === 'mnist',
         encoder: $('encoder').value,
         full_training: $('scope').value === 'full',
         limit: Number($('limit').value),
@@ -54,27 +91,42 @@ $('extract').onclick = async () => {
     });
     const job = await response.json();
     if (!response.ok) throw new Error(job.error || 'Extraction failed');
-    const data = await waitForJob(job.job_id);
+    const data = await waitForJob(job.job_id, revision);
+    if (revision !== buildRevision) return;
     const representations = data.representations || [data];
-    $('summary').textContent = representations
+    $('summary').textContent = data.pixels_only ? `${data.samples} MNIST images ready · pixel scanning` : representations
       .map(item => `${item.encoder || 'minilm'}: ${item.samples} samples · ${item.feature_dim}D raw · ${item.reduced_dim}D PCA`)
       .join(' | ');
     $('artifacts').textContent = data.feature_file
       ? `Saved for reuse: ${representations.map(item => `${item.feature_file}${item.image_file ? ` · images: ${item.image_file}` : ''}`).join(' | ')}`
       : '';
-    $('result').hidden = false; draw(data.visual_features, data.labels);
-    $('status').textContent = data.poisoned === null ? 'Extraction complete' : `Extraction complete · ${data.poisoned} poisoned samples`;
-  } catch (error) { $('status').textContent = `Error: ${error.message}`; }
-  finally { $('extract').disabled = false; }
+    // Leila: scan readiness must not depend on the optional visualization.
+    if (scanSettings() === extractionSettings) {
+      document.dispatchEvent(new CustomEvent('features-ready', {detail: data}));
+    }
+    // Leila: a pixels-only build has no encoder/PCA plot to display.
+    $('result').hidden = false;
+    $('plot').hidden = !!data.pixels_only;
+    if (!data.pixels_only) draw(data.visual_features, data.labels);
+    $('status').textContent = data.poisoned === null ? 'Dataset ready' : `Dataset ready · ${data.poisoned} poisoned samples`;
+  } catch (error) { if (revision === buildRevision) $('status').textContent = `Error: ${error.message}`; }
+  finally {
+    // Leila: unlock on success or failure; clean datasets still have poison rate disabled.
+    buildControls.forEach((control,index) => { control.disabled = previousDisabled[index]; });
+    buildingDataset = false;
+    $('extract').disabled = false;
+  }
 };
 
-async function waitForJob(jobId) {
+async function waitForJob(jobId, revision) {
   while (true) {
     const response = await fetch(`/api/jobs/${jobId}`);
     const job = await response.json();
     if (!response.ok || job.status === 'error') throw new Error(job.message || 'Extraction failed');
-    $('progress').value = job.progress;
-    $('progress-copy').textContent = `${job.progress}% · ${job.message}`;
+    if (revision === buildRevision) {
+      $('progress').value = job.progress;
+      $('progress-copy').textContent = `${job.progress}% · ${job.message}`;
+    }
     if (job.status === 'complete') return job.result;
     await new Promise(resolve => setTimeout(resolve, 500));
   }

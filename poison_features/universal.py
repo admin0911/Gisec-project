@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 from .bundle import FeatureBundle
-from .image import DINOv2ImageEncoder, ResNet18ImageEncoder
+from .image import ResNet18ImageEncoder
 from .preprocessing import prepare_representations, prepare_visual_features
 
 
@@ -26,13 +26,13 @@ class UniversalFeatureExtractor:
         visual: bool = True,
         progress: Any = None,
     ) -> FeatureBundle:
-        if encoder not in {"resnet18", "dinov2"}:
+        if encoder == "resnet18":
+            image_encoder = ResNet18ImageEncoder(device=self.device)
+        elif encoder in {"dinov2", "dinov2_vits14"}:
+            from .image import DINOv2ImageEncoder
+            image_encoder = DINOv2ImageEncoder(device=self.device)
+        else:
             raise ValueError(f"Unsupported image encoder: {encoder}")
-        image_encoder = (
-            ResNet18ImageEncoder(device=self.device)
-            if encoder == "resnet18"
-            else DINOv2ImageEncoder(device=self.device)
-        )
         features = image_encoder.extract(
             dataset,
             batch_size=self.batch_size,
@@ -64,5 +64,6 @@ class UniversalFeatureExtractor:
             original_labels=None if attack_metadata is None else attack_metadata.original_labels,
             is_poisoned=None if attack_metadata is None else attack_metadata.is_poisoned,
             poison_type=None if attack_metadata is None else attack_metadata.poison_type,
-            metadata={"device": str(image_encoder.device)},
+            metadata={"device": str(image_encoder.device),
+                      "encoder_revision": getattr(image_encoder, "revision", None)},
         )

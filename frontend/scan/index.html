@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>PoisonGuard · Scan</title></head>
+<body><p>Opening scan results…</p>
+<!-- Leila: support /scan on running servers without interrupting training or extraction. -->
+<script>
+const query = new URLSearchParams(location.search);
+const selection = history.state?.poisonGuardScan;
+if (!query.has('job') && selection?.job) query.set('job',selection.job);
+location.replace('/scan-results.html' + (query.size ? '?' + query : ''));
+</script>
+<noscript>Enable JavaScript to open scan results.</noscript>
+</body></html>

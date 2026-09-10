@@ -1,0 +1,50 @@
+<!-- Leila: scan links and cached navigation scripts use /scan. -->
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoisonGuard · Human review</title>
+<!-- Leila: refresh the review stylesheet so saved browser styles cannot hide the smaller thumbnails. -->
+<link rel="stylesheet" href="/scan-results.css"><link rel="stylesheet" href="/human-review.css?v=footer-groups">
+</head><body><main class="scan-page">
+<nav><a id="back" href="/scan">← Scan results</a><span class="page-badge">HUMAN REVIEW</span></nav>
+<h1>Review the findings</h1>
+<p class="lede">Check each image against its supplied label. Keep it, quarantine it, or mark it unsure.</p>
+<!-- Leila: training preparation reads saved choices into a new version; existing versions stay fixed. -->
+<p class="help">CIFAR-10 images are originally 32 × 32 pixels. Enlarging them does not add detail. Saved choices are included when you prepare a new training dataset.</p>
+<div class="review-toolbar">
+  <label>Review group<select id="group"><option value="uncertain">Needs review</option><option value="suspected_label_flip">Poisoned data · suspected</option></select></label>
+  <label>Images per page<select id="size"><option>20</option><option>50</option><option>100</option></select></label>
+  <strong id="counts"></strong>
+</div>
+<p id="review-status" role="status" aria-live="polite">Loading images…</p>
+<div id="review-grid" class="review-grid" aria-busy="true"></div>
+<div class="review-footer">
+  <!-- Leila: group page navigation around the page counter; navigation does not save. -->
+  <div class="review-pagination">
+    <button id="previous" type="button">← Previous</button>
+    <span id="page-info"></span>
+    <!-- Leila: white styling for page navigation. -->
+    <button id="next" type="button">Next page →</button>
+  </div>
+  <!-- Leila: keep Save review beside Finish review in a separate action group. -->
+  <div class="review-footer-actions">
+    <!-- Leila: blue styling for the explicit Save action. -->
+    <button id="save" type="button" class="primary">Save review</button>
+    <button id="finish" type="button" class="primary">Finish review</button>
+  </div>
+</div>
+<p class="help">Moving between pages does not save. Choices stay pending until you use Save review or confirm Save when finishing. Unsure and unreviewed samples stay unresolved. Suggested alternative labels are not available in these saved scans.</p>
+<!-- Leila: load the updated navigation handler rather than a cached review script. -->
+</main>
+<!-- Leila: Finish asks before saving pending choices; Cancel preserves them on the page. -->
+<dialog id="finish-confirm" aria-labelledby="finish-title" aria-describedby="finish-description">
+  <h2 id="finish-title">Save your changes?</h2>
+  <p id="finish-description">You have unsaved review choices. Do you want to save them and finish?</p>
+  <div class="confirm-actions">
+    <button id="finish-cancel" type="button" autofocus>Cancel</button>
+    <!-- Leila: discard pending choices only; saved reviews are kept. -->
+    <button id="finish-discard" type="button">Don’t save</button>
+    <button id="finish-save" type="button" class="primary">Save</button>
+  </div>
+</dialog>
+<!-- Leila: refresh the controller for the short review address. -->
+<script src="/human-review.js?v=combined-review"></script></body></html>

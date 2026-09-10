@@ -1,0 +1,18 @@
+/* Label-flip UI additions; the shared feature-layer stylesheet stays unchanged. */
+.scan-controls { margin: 1.5rem 0; padding: 1.25rem; border: 1px solid #34415a; border-radius: 12px; }
+.scan-controls label { margin-bottom: 1rem; }
+.scan-controls select { width: 100%; min-width: 0; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+a { color: #72e6c2; }
+.scan-page { padding-top: 3rem; }
+.scan-page h1 { font-size: clamp(2.5rem, 7vw, 4.5rem); }
+.assessment-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+.assessment-grid strong { font-size: 2.5rem; }
+.uncertain { border-color: #dbac59; }
+.suspected { border-color: #dd7b77; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+th, td { text-align: left; padding: .85rem; border-bottom: 1px solid #34415a; }
+details { margin-top: 1.5rem; padding: 1rem; border: 1px solid #34415a; border-radius: 8px; }
+summary { cursor: pointer; color: #72e6c2; font-weight: 700; }
+#scan-file, #scan-examples { overflow-wrap: anywhere; }

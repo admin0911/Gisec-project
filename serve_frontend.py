@@ -20,6 +20,18 @@ from poison_features import (
     extract_text,
 )
 from poison_features.attacks import poison_dataset, poison_texts
+from detectors.blended_injection.pipeline import scan_as_connector_result
+from detectors.output_connector import to_jsonable
+
+# Leila: keep label-flip scanning in its own adapter alongside the extraction API.
+from label_flip_api import handle_scan_request
+
+# Leila: optional human review and reopening saved scan results after a restart.
+from review_api import handle_review_request
+from cleaning.human_review import restored_scan_job
+
+# Leila: keep preparation and training routes in a separate adapter.
+from training_api import handle_training_request
 
 JOBS: dict[str, dict] = {}
 JOBS_LOCK = threading.Lock()
@@ -27,6 +39,18 @@ JOBS_LOCK = threading.Lock()
 
 class FeatureHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
+        # Leila: offer a short human review route while retaining old bookmarks.
+        if self.path.split('?',1)[0] in ('/review','/review/'):
+            self.path = '/human-review.html'
+            return super().do_GET()
+        # Leila: retain legacy links while exposing the short scan results route.
+        if self.path.split('?',1)[0] in ('/scan','/scan/'):
+            self.path = '/scan-results.html'
+            return super().do_GET()
+        # Leila: serve the existing training page at the short public route.
+        if self.path.split('?',1)[0] in ('/train','/train/'):
+            self.path = '/training.html'
+            return super().do_GET()
         if self.path == "/api/datasets":
             self._json({
                 "datasets": ["cifar10", "mnist", "imdb"],
@@ -38,6 +62,14 @@ class FeatureHandler(SimpleHTTPRequestHandler):
             job_id = self.path.rsplit("/", 1)[-1]
             with JOBS_LOCK:
                 job = JOBS.get(job_id)
+            # Leila: completed scans can be restored from disk without rerunning detectors.
+            if job is None:
+                try:
+                    job = restored_scan_job(job_id)
+                    with JOBS_LOCK:
+                        JOBS[job_id] = job
+                except (ValueError, OSError, KeyError, TypeError):
+                    pass
             if job is None:
                 self.send_error(404, "Unknown extraction job")
                 return
@@ -46,6 +78,18 @@ class FeatureHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        # Leila: preparation snapshots saved reviews; training runs only on explicit request.
+        if handle_training_request(self):
+            return
+        # Leila: save human decisions separately; extraction and scanning retain their routes.
+        if handle_review_request(self):
+            return
+        # Leila: handle scan requests first; existing extraction requests continue below.
+        if handle_scan_request(self, JOBS, JOBS_LOCK, update_job):
+            return
+        if self.path == "/api/blended-injection/scan":
+            handle_blended_scan_request(self)
+            return
         if self.path != "/api/extract":
             self.send_error(404)
             return
@@ -79,8 +123,49 @@ def update_job(job_id: str, **changes) -> None:
         JOBS[job_id].update(changes)
 
 
+def handle_blended_scan_request(handler: FeatureHandler) -> None:
+    """Start Titus's detector against a saved post-attack image bundle."""
+    size = int(handler.headers.get("Content-Length", "0"))
+    request = json.loads(handler.rfile.read(size))
+    image_file = request.get("image_file")
+    if not isinstance(image_file, str):
+        handler._json({"error": "A saved image bundle is required."}, status=400)
+        return
+    artifacts = Path("artifacts").resolve()
+    image_path = (artifacts / Path(image_file).name).resolve()
+    if image_path.parent != artifacts or not image_path.is_file():
+        handler._json({"error": "The saved image bundle is missing."}, status=400)
+        return
+    job_id = uuid.uuid4().hex
+    with JOBS_LOCK:
+        JOBS[job_id] = {
+            "job_id": job_id, "status": "queued", "progress": 0,
+            "message": "Blended-injection scan queued",
+        }
+
+    def worker() -> None:
+        try:
+            update_job(job_id, status="running", progress=15, message="Loading saved images")
+            pixels = ImageInputBundle.load(image_path)
+            update_job(job_id, progress=35, message="Scanning shared residual signatures")
+            result = scan_as_connector_result(pixels)
+            payload = to_jsonable(result)
+            payload["image_file"] = str(image_path)
+            update_job(
+                job_id, status="complete", progress=100,
+                message="Blended-injection scan complete", result=payload,
+            )
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            update_job(job_id, status="error", progress=100, message=str(exc))
+
+    threading.Thread(target=worker, daemon=True).start()
+    handler._json({"job_id": job_id, "status": "queued"}, status=202)
+
+
 def bundle_result(bundle: FeatureBundle, feature_path: Path, image_path: Path | None) -> dict:
     return {
+        # Leila: identify each encoder in the combined extraction response.
+        "encoder": bundle.encoder,
         "dataset": bundle.dataset_name,
         "samples": len(bundle.features),
         "feature_dim": bundle.original_feature_dim,
@@ -117,8 +202,12 @@ def run_extraction(job_id: str, request: dict) -> None:
         poison_count = None if poison_count is None else int(poison_count)
         if attack == "none":
             poison_rate = 0.0
-        if attack != "none" and poison_rate not in {0.01, 0.03, 0.05, 0.10}:
-            raise ValueError("poison_rate must be 1%, 3%, 5%, or 10%")
+        # Leila: allow 7% for label-flip and patch-backdoor experiments.
+        allowed_rates = {0.01, 0.03, 0.05, 0.10}
+        if attack in {"label_flip", "backdoor"}: allowed_rates.add(0.07)
+        if attack != "none" and poison_rate not in allowed_rates:
+            choices = ', '.join(f'{rate:.0%}' for rate in sorted(allowed_rates))
+            raise ValueError(f"poison_rate must be one of: {choices}")
         split = request.get("split", "train")
         artifacts = Path("artifacts")
         artifacts.mkdir(exist_ok=True)
@@ -160,9 +249,9 @@ def run_extraction(job_id: str, request: dict) -> None:
                 )
             update_job(job_id, progress=15, message=f"Encoding {total:,} reviews with MiniLM")
             bundle = extract_text(
-                texts, labels=labels, sample_ids=range(total), dataset_name=name,
+                texts, labels=labels, sample_ids=[f"imdb-{split}:{int(i)}" for i in indices], dataset_name=name,
                 original_labels=metadata.get("original_labels"),
-                is_poisoned=metadata.get("is_poisoned"),
+                is_poisoned=metadata.get("is_poisoned", np.zeros(total,dtype=bool)),
                 poison_type=metadata.get("poison_type"),
             )
             bundle.save(feature_path)
@@ -187,12 +276,36 @@ def run_extraction(job_id: str, request: dict) -> None:
                 poison_count=poison_count,
                 seed=int(request.get("seed", 0)),
             )
+            # Leila: retain main's dual-encoder workflow and aligned attacked rows.
             if limit is not None and limit < len(attacked_dataset):
                 attacked_dataset = attacked_dataset.take(limit)
         total = len(clean_dataset)
         sample_ids = np.asarray([f"{name}-{split}:{i}" for i in range(total)])
         labels = np.asarray([attacked_dataset[i][1] for i in range(total)])
         metadata = getattr(attacked_dataset, "metadata", None)
+        # Leila: reversible MNIST-only bypass; omitted/false keeps the original encoder workflow.
+        if name == 'mnist' and request.get('pixels_only') is True:
+            update_job(job_id,progress=15,message='Preparing MNIST pixels; feature extraction bypassed')
+            stem = f"{name}-{split}-{size_key}-pixels-only-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
+            image_path = artifacts / f'{stem}-images.npz'
+            pixels = load_image_inputs(attacked_dataset, sample_ids=sample_ids)
+            same = False
+            if image_path.is_file():
+                previous = ImageInputBundle.load(image_path)
+                same = (np.array_equal(previous.images,pixels.images) and
+                        np.array_equal(previous.labels,pixels.labels) and
+                        np.array_equal(previous.sample_ids,pixels.sample_ids))
+            if not same: pixels.save(image_path)
+            # Leila: poison identities stay separate from the image connector used by scanning.
+            np.savez_compressed(artifacts / f'{stem}-evaluation.npz',sample_ids=sample_ids,
+                is_poisoned=np.zeros(total,dtype=bool) if metadata is None else metadata.is_poisoned[:total],
+                original_labels=labels if metadata is None else metadata.original_labels[:total])
+            result = dict(dataset='mnist',samples=total,pixels_only=True,encoder=None,
+                image_file=str(image_path),feature_file=str(image_path),
+                poisoned=0 if metadata is None else int(metadata.is_poisoned[:total].sum()),
+                visual_features=None,labels=[])
+            update_job(job_id,status='complete',progress=100,message='MNIST pixels ready',result=result)
+            return
         encoders = ["resnet18", "dinov2"] if name == "cifar10" else [encoder]
         results = []
         clean_images_path = artifacts / f"{name}-{split}-{size_key}-images.npz"
@@ -203,11 +316,16 @@ def run_extraction(job_id: str, request: dict) -> None:
             encoder_key = encoder_name
             clean_stem = f"{name}-{split}-{size_key}-{encoder_key}-none-a{0.0:.2f}-t0-nrate-000-seed{int(request.get('seed', 0))}"
             clean_feature_path = artifacts / f"{clean_stem}-features.npz"
-            attack_stem = f"{name}-{split}-{size_key}-{encoder_key}-{attack_key}-seed{int(request.get('seed', 0))}"
+            # Leila: separate poison rates and make clean runs reusable by label flips.
+            attack_stem = clean_stem if attack == "none" else f"{name}-{split}-{size_key}-{encoder_key}-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
             feature_path = artifacts / f"{attack_stem}-features.npz"
             image_path = artifacts / f"{attack_stem}-images.npz"
             if attack in {"label_flip", "targeted_label_flip"} and clean_feature_path.exists():
                 base = FeatureBundle.load(clean_feature_path)
+                # Leila: cached features must describe these exact original rows.
+                if (not np.array_equal(base.sample_ids,sample_ids) or len(base.labels) != total
+                        or (metadata is not None and not np.array_equal(base.labels,metadata.original_labels[:total]))):
+                    raise ValueError('Cached clean feature rows do not match the requested input.')
                 bundle = FeatureBundle(
                     features=base.features,
                     scaled_features=base.scaled_features,
@@ -221,11 +339,14 @@ def run_extraction(job_id: str, request: dict) -> None:
                     original_labels=None if metadata is None else metadata.original_labels[:total],
                     is_poisoned=None if metadata is None else metadata.is_poisoned[:total],
                     poison_type=None if metadata is None else metadata.poison_type[:total],
-                    metadata={**(base.metadata or {}), "attack": attack, "reused_clean_features": True},
+                    # Leila: replace clean-run truth with this attack's evaluation metadata.
+                    metadata={**(base.metadata or {}), "attack": attack, "reused_clean_features": True,
+                        "poison_rate": poison_rate, "target_label": target_label, "blend_alpha": blend_alpha,
+                        "poison_count": 0 if metadata is None else int(metadata.is_poisoned[:total].sum())},
                 )
                 bundle.save(feature_path)
-                if not image_path.exists():
-                    load_image_inputs(clean_dataset, sample_ids=sample_ids).save(image_path)
+                # Leila: label flipping preserves pixels but image labels must match features.
+                load_image_inputs(attacked_dataset, sample_ids=sample_ids).save(image_path)
             elif feature_path.exists():
                 bundle = FeatureBundle.load(feature_path)
             else:
@@ -252,7 +373,8 @@ def run_extraction(job_id: str, request: dict) -> None:
                     load_image_inputs(source, sample_ids=sample_ids).save(image_path)
             results.append(bundle_result(bundle, feature_path, image_path))
         update_job(job_id, progress=95, message="Preparing PCA visualization")
-        primary = results[0]
+        # Leila: copy the primary result so the JSON response has no circular reference.
+        primary = dict(results[0])
         primary["representations"] = results
         update_job(job_id, status="complete", progress=100, message="Extraction complete", result=primary)
     except Exception as exc:

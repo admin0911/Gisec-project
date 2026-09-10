@@ -1,3 +1,4 @@
+<!-- Leila: scan links and cached navigation scripts use /scan. -->
 <!doctype html>
 <html lang="en">
   <head>
@@ -5,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Gisec PoisonGuard · Feature Layer</title>
     <link rel="stylesheet" href="/style.css">
+    <!-- Leila: styles for the added scan controls and results page. -->
+    <link rel="stylesheet" href="/label-flip.css">
   </head>
   <body>
     <main>
@@ -29,12 +32,36 @@
         <label id="source-control" hidden>Source label <input id="source-label" type="number" value="1" min="0" max="9"></label>
         <label id="target-control" hidden>Target label <input id="target-label" type="number" value="0" min="0" max="9"></label>
         <label id="alpha-control" hidden>Blend alpha <input id="blend-alpha" type="number" value="0.10" min="0.01" max="1" step="0.01"></label>
-        <label>Poison rate <select id="poison-rate"><option value="0.01">1%</option><option value="0.03">3%</option><option value="0.05" selected>5%</option><option value="0.10">10%</option></select></label>
-        <button id="extract">Extract features</button>
+        <!-- Leila: 7% is available for label-flip and backdoor dataset builds. -->
+        <label>Poison rate <select id="poison-rate"><option value="0.01">1%</option><option value="0.03">3%</option><option value="0.05" selected>5%</option><option id="rate-seven" value="0.07" hidden disabled>7%</option><option value="0.10">10%</option></select></label>
+        <!-- Leila: use Build dataset as the user-facing label for the existing action. -->
+        <button id="extract">Build dataset</button>
       </section>
       <p id="status" class="status">Ready</p>
       <progress id="progress" value="0" max="100" hidden></progress>
       <p id="progress-copy" class="progress-copy" hidden></p>
+      <!-- Leila: scan becomes available after both matching image encoders finish. -->
+      <section class="scan-controls" aria-label="Label-flip scanning">
+        <!-- Leila: choose existing feature pairs without repeating extraction. -->
+        <label>Saved features for scanning
+          <select id="saved-scan-features"><option value="">Loading saved features…</option></select>
+        </label>
+        <button id="scan-label-flips" disabled>Scan label flips</button>
+        <p id="scan-readiness" class="help" aria-live="polite">Build a dataset or select saved features to enable scanning.</p>
+        <a id="last-scan" href="/scan" hidden>View last scan results</a>
+      </section>
+      <section class="scan-controls" aria-label="Blended-injection detection">
+        <label>Blended detector input
+          <select id="blended-scan-images"><option value="">Build a CIFAR-10 dataset first</option></select>
+        </label>
+        <button id="scan-blended" disabled>Run blended detector</button>
+        <p id="blended-status" class="help" aria-live="polite">Titus's detector searches for shared low-amplitude residual signals.</p>
+        <div id="blended-result" hidden>
+          <strong id="blended-summary"></strong>
+          <p id="blended-details" class="help"></p>
+          <div id="blended-examples"></div>
+        </div>
+      </section>
       <section id="result" class="result" hidden>
         <strong id="summary"></strong>
         <p id="artifacts" class="help"></p>
@@ -52,6 +79,11 @@
       </section>
       <p class="status">Feature layer ready · connect your detector through the documented adapters</p>
     </main>
-    <script src="/app.js"></script>
+    <!-- Leila: refresh build controls so settings stay locked during extraction. -->
+    <!-- Leila: temporarily bypass MNIST encoding at build time. -->
+    <script src="/app.js?v=backdoor-seven"></script>
+    <!-- Leila: separate scan controller listens for completed feature extractions. -->
+    <script src="/label-flip.js?v=direct-scan-ready"></script>
+      <script src="/blended-detector.js?v=1"></script>
   </body>
 </html>

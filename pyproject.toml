@@ -8,8 +8,9 @@ version = "0.1.0"
 description = "Standalone detector-ready feature extraction for PoisonGuard"
 requires-python = ">=3.12"
 dependencies = [
-  "numpy>=1.26",
-  "scikit-learn>=1.4",
+  "numpy==1.26.4",
+  "scikit-learn==1.7.2",
+  "cleanlab==2.7.1",
   "tqdm>=4.66",
   "pillow>=10.0",
   "torch>=2.2",

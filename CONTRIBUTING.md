@@ -65,10 +65,10 @@ The frontend's **Extraction scope** controls workload:
 
 Choose **Clean**, **Random label flip**, **Targeted label flip**, **Backdoor
 patch**, or **Blended noise injection**. For attacks, use only the provided
-1%, 3%, 5%, or 10% poison rates. Clean runs have no poisoned rows. Targeted
-label flip selects poisoned rows only from the configured source class and
-changes them to the configured target class; source and target must differ.
-Blended injection uses a shared
+1%, 3%, 5%, 7%, or 10% poison rates where supported. Clean runs have no
+poisoned rows. Targeted label flip selects poisoned rows only from the
+configured source class and changes them to the configured target class;
+source and target must differ. Blended injection uses a shared
 low-amplitude noise pattern, default `alpha=0.10`, and target label `0`
 (airplane for CIFAR-10); a full 3% CIFAR-10 run is approximately 1,500 rows.
 Completed image runs create matching `*-features.npz` and
