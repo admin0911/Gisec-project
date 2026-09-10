@@ -41,7 +41,7 @@
       <progress id="progress" value="0" max="100" hidden></progress>
       <p id="progress-copy" class="progress-copy" hidden></p>
       <!-- Leila: scan becomes available after both matching image encoders finish. -->
-      <section class="scan-controls" aria-label="Label-flip scanning">
+      <section id="label-flip-controls" class="scan-controls" aria-label="Label-flip scanning">
         <!-- Leila: choose existing feature pairs without repeating extraction. -->
         <label>Saved features for scanning
           <select id="saved-scan-features"><option value="">Loading saved features…</option></select>
@@ -50,12 +50,12 @@
         <p id="scan-readiness" class="help" aria-live="polite">Build at least 21 balanced samples, or select a saved extraction, to enable scanning.</p>
         <a id="last-scan" href="/scan" hidden>View unified results</a>
       </section>
-      <section class="scan-controls" aria-label="Blended-injection detection">
+      <section id="blended-controls" class="scan-controls" aria-label="Blended-injection detection" hidden>
         <label>Blended detector input
           <select id="blended-scan-images"><option value="">Build a CIFAR-10 dataset first</option></select>
         </label>
         <button id="scan-blended" disabled>Run blended detector</button>
-        <p id="blended-status" class="help" aria-live="polite">Titus's detector searches for shared low-amplitude residual signals.</p>
+        <p id="blended-status" class="help" aria-live="polite">Build a blended-injection dataset to enable this detector.</p>
         <div id="blended-result" hidden>
           <strong id="blended-summary"></strong>
           <p id="blended-details" class="help"></p>
@@ -88,9 +88,9 @@
     </main>
     <!-- Leila: refresh build controls so settings stay locked during extraction. -->
     <!-- Leila: temporarily bypass MNIST encoding at build time. -->
-    <script src="/app.js?v=pipeline-routing-v2"></script>
+    <script src="/app.js?v=attack-workflow-v1"></script>
     <!-- Leila: separate scan controller listens for completed feature extractions. -->
-    <script src="/label-flip.js?v=pipeline-routing-v2"></script>
+    <script src="/label-flip.js?v=attack-workflow-v1"></script>
     <script src="/blended-detector.js?v=1"></script>
   </body>
 </html>

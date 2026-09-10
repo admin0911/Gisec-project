@@ -10,11 +10,14 @@ function updateAttackOptions() {
   $('encoder-control').hidden = true;
   // Leila: text scanning supports clean reviews and label flips.
   const textDataset = $('dataset').value === 'imdb';
+  const cifarDataset = $('dataset').value === 'cifar10';
   for (const option of $('attack').options) {
-    option.hidden = textDataset && !['none','label_flip'].includes(option.value);
+    option.hidden = (textDataset && !['none','label_flip'].includes(option.value))
+      || (!cifarDataset && option.value === 'blended_injection');
     option.disabled = option.hidden;
   }
-  if (textDataset && !['none','label_flip'].includes($('attack').value)) $('attack').value='none';
+  if ((textDataset && !['none','label_flip'].includes($('attack').value))
+      || (!cifarDataset && $('attack').value === 'blended_injection')) $('attack').value='none';
   $('attack').disabled = false;
   $('poison-rate').disabled = $('attack').value === 'none';
   const targeted = $('attack').value === 'targeted_label_flip';
@@ -27,9 +30,22 @@ function updateAttackOptions() {
   const labelFlip = ['label_flip', 'targeted_label_flip', 'backdoor'].includes($('attack').value);
   $('rate-seven').hidden = !labelFlip; $('rate-seven').disabled = !labelFlip;
   if (!labelFlip && $('poison-rate').value === '0.07') $('poison-rate').value = '0.05';
+  updateWorkflowVisibility();
 }
 $('dataset').onchange = updateAttackOptions;
 $('attack').onchange = updateAttackOptions;
+function updateWorkflowVisibility() {
+  const attack = $('attack').value;
+  const cifar = $('dataset').value === 'cifar10';
+  const labelFlip = ['label_flip', 'targeted_label_flip'].includes(attack);
+  const blended = attack === 'blended_injection' && cifar;
+  $('label-flip-controls').hidden = !labelFlip;
+  $('blended-controls').hidden = !blended;
+  if (!blended) $('blended-result').hidden = true;
+  if (!labelFlip) {
+    $('last-scan').hidden = true;
+  }
+}
 $('scope').onchange = () => {
   const fullTraining = $('scope').value === 'full';
   $('sample-control').hidden = fullTraining;

@@ -28,7 +28,7 @@
     input.replaceChildren(new Option(`${image.encoder || 'image'} · ${image.samples} images`, imageFile));
     input.value = imageFile;
     button.disabled = false;
-    status.textContent = 'Saved post-attack pixels are ready for Titus’s detector.';
+    status.textContent = 'Saved blended-injection pixels are ready for analysis.';
     if (document.getElementById('attack').value === 'blended_injection') runScan();
   });
 
