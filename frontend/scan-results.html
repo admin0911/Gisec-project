@@ -40,7 +40,13 @@
         <article class="uncertain"><span>Flagged samples</span><strong id="pipeline-flagged">0</strong><p>Detector findings requiring interpretation.</p></article>
         <article class="suspected"><span>Class contrast</span><strong id="pipeline-contrast">0.00</strong><p>Higher contrast indicates a stronger shared signal.</p></article>
       </div>
-      <p class="help">These are detector findings, not proof of poisoning. Use the dedicated detector panel for detailed scores.</p>
+      <p class="help">These are detector findings, not proof of poisoning. Use optional human review before preparing training data.</p>
+      <div class="blended-result-metrics">
+        <span>Flag rate <b id="pipeline-rate">0%</b></span>
+        <span>Class ratio <b id="pipeline-ratio">0.00</b></span>
+        <span>Strongest class <b id="pipeline-strongest">None</b></span>
+      </div>
+      <canvas id="pipeline-contrast-chart" width="860" height="220" aria-label="Animated blended detector class contrast chart"></canvas>
     </section>
     <!-- Leila: these cards describe label-flip results only. -->
     <h2>Label-flip findings</h2>
@@ -90,4 +96,4 @@
     <p style="margin-top:28px"><a id="prepare-training" class="review-primary" href="#">Prepare training dataset →</a></p>
   </section>
 <!-- Leila: refresh the results controller to show current saved reviews after returning. -->
-</main><!-- Leila: use the short human review links. --><script src="/scan-results.js?v=combined-review-v2"></script></body></html>
+</main><!-- Leila: use the short human review links. --><script src="/scan-results.js?v=review-training-pipeline-v1"></script></body></html>

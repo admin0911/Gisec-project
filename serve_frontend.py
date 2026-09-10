@@ -162,6 +162,47 @@ def handle_blended_scan_request(handler: FeatureHandler) -> None:
     handler._json({"job_id": job_id, "status": "queued"}, status=202)
 
 
+def save_blended_review_record(job_id: str, bundle: ImageInputBundle, feature_file: str,
+                               detector: dict, ui_result: dict) -> None:
+    """Persist Titus findings using Leila's review/training scan contract."""
+    detector = to_jsonable(detector)
+    ui_result = to_jsonable(ui_result)
+    flags = np.asarray(detector.get("flags", []), dtype=bool)
+    sample_ids = bundle.sample_ids.tolist()
+    if flags.shape != (len(sample_ids),):
+        raise ValueError("Blended detector flags do not match saved image rows.")
+    states = np.where(flags, "uncertain", "not_flagged").tolist()
+    labels = bundle.labels.tolist()
+    record = {
+        "schema_version": "1.0",
+        "job_id": job_id,
+        "dataset": "cifar10",
+        "feature_files": [feature_file],
+        "assessment": {
+            "sample_ids": sample_ids,
+            "assessment": states,
+            "flags": flags.tolist(),
+            "summary": {
+                "not_flagged": int((~flags).sum()),
+                "uncertain": int(flags.sum()),
+                "suspected_label_flip": 0,
+            },
+            "vote_counts": {
+                "resnet18": [int(value) for value in flags],
+                "dinov2": [int(value) for value in flags],
+            },
+        },
+        "profile": {"name": "blended_injection", "limitation": "Detector findings require human review."},
+        "scans": {},
+        "ui_result": ui_result,
+    }
+    root = Path("artifacts") / "label_flip_scans" / job_id
+    root.mkdir(parents=True, exist_ok=True)
+    temporary = root / "results.tmp"
+    temporary.write_text(json.dumps(record, allow_nan=False), encoding="utf-8")
+    temporary.replace(root / "results.json")
+
+
 def bundle_result(bundle: FeatureBundle, feature_path: Path, image_path: Path | None) -> dict:
     return {
         # Leila: identify each encoder in the combined extraction response.
@@ -387,6 +428,15 @@ def run_extraction(job_id: str, request: dict) -> None:
                     scan_as_connector_result(ImageInputBundle.load(image_path))
                 )
             }
+            primary["human_review_enabled"] = True
+            primary["review_job_id"] = job_id
+            save_blended_review_record(
+                job_id,
+                ImageInputBundle.load(image_path),
+                str(feature_path),
+                primary["detectors"]["blended_injection"],
+                primary,
+            )
         update_job(job_id, status="complete", progress=100, message="Extraction complete", result=primary)
     except Exception as exc:
         update_job(job_id, status="error", progress=100, message=str(exc))

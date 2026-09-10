@@ -91,6 +91,10 @@ details[open] summary { margin-bottom: 16px; }
 /* Leila: compact saved human decisions, visually distinct from detector result cards. */
 .human-review-summary { margin: 0 0 28px; }
 .human-review-summary .help { margin: 8px 0 12px; }
+.blended-result-metrics { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
+.blended-result-metrics span { padding: 10px 14px; border-radius: 8px; background: #eef3fb; color: #53637b; font-size: .85rem; }
+.blended-result-metrics b { margin-left: 8px; color: #25354e; }
+#pipeline-contrast-chart { display: block; width: 100%; max-width: 860px; border-radius: 10px; margin: 18px 0 10px; }
 .review-counts { display: flex; flex-wrap: wrap; gap: 10px; }
 .review-counts span { padding: 10px 14px; border-radius: 8px; font-size: .85rem; }
 .review-counts b { margin-left: 10px; font-variant-numeric: tabular-nums; }
