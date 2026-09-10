@@ -15,6 +15,9 @@
 
 See [FEATURE_DETECTORS.md](backdoor/FEATURE_DETECTORS.md) for the experimental
 backdoor feature methods, command-line runs, thresholds, and limitations.
+To scan saved image/feature pairs together and open a visual HTML report, use
+[RUN_IMAGE_SCAN.md](backdoor/RUN_IMAGE_SCAN.md). Pixel flags remain review
+candidates even when feature detectors return no flags.
 
 Start with [CONNECTOR.md](CONNECTOR.md) for integration, or
 [CONFIDENT_LEARNING.md](label_flip/CONFIDENT_LEARNING.md) for label-flip experiment setup.
