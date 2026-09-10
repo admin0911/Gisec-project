@@ -31,7 +31,7 @@
     }
   }
   function render(data) {
-    if (data && data.detectors) {
+    if (data && data.detectors && !Array.isArray(data.detectors) && data.detectors.blended_injection) {
       renderPipeline(data);
       return;
     }
