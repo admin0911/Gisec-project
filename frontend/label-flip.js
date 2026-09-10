@@ -56,7 +56,7 @@
       }
       saved.value = selected || '';
       if (selected) await check(selected);
-      else { button.disabled = true; message.textContent = 'Choose saved data above or build the dataset first.'; }
+      else { button.disabled = true; message.textContent = 'Choose a saved extraction with at least 21 balanced samples.'; }
     } catch (error) { if (current === generation) message.textContent = error.message; }
   }
   saved.addEventListener('change', () => check(saved.value));

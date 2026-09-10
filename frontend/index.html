@@ -26,7 +26,7 @@
           </select>
         </label>
         <label id="sample-control">Sample count
-          <input id="limit" type="number" value="100" min="2" max="50000">
+          <input id="limit" type="number" value="100" min="21" max="50000">
         </label>
         <label>Attack <select id="attack"><option value="none">Clean</option><option value="label_flip">Random label flip</option><option value="targeted_label_flip">Targeted label flip</option><option value="backdoor">Backdoor patch</option><option value="blended_injection">Blended noise injection</option></select></label>
         <label id="source-control" hidden>Source label <input id="source-label" type="number" value="1" min="0" max="9"></label>
@@ -47,7 +47,7 @@
           <select id="saved-scan-features"><option value="">Loading saved features…</option></select>
         </label>
         <button id="scan-label-flips" disabled>Scan label flips</button>
-        <p id="scan-readiness" class="help" aria-live="polite">Build a dataset or select saved features to enable scanning.</p>
+        <p id="scan-readiness" class="help" aria-live="polite">Build at least 21 balanced samples, or select a saved extraction, to enable scanning.</p>
         <a id="last-scan" href="/scan" hidden>View last scan results</a>
       </section>
       <section class="scan-controls" aria-label="Blended-injection detection">
