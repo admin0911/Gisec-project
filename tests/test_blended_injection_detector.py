@@ -5,6 +5,7 @@ import numpy as np
 from poison_features.image_inputs import ImageInputBundle
 from detectors.blended_injection import (
     scan_all_classes,
+    scan_background_lift,
     BlendedInjectionDetector,
     flag_samples,
     scan_blended_injection,
@@ -307,3 +308,112 @@ class TestAutomaticClassDiscovery(unittest.TestCase):
         self.assertEqual(result["flags"].dtype, np.dtype(bool))
         self.assertTrue(np.isfinite(result["scores"]).all())
         np.testing.assert_array_equal(result["sample_ids"], bundle.sample_ids)
+
+
+def _digit_like_batch(rng, n_samples, size=28):
+    """Images with a true black background, as MNIST has.
+
+    The background is exactly zero, which is the property the background check
+    depends on: noise cannot be blended in without lifting those pixels.
+    """
+    images = np.zeros((n_samples, 1, size, size), dtype=np.float32)
+    for i in range(n_samples):
+        shape = i % 10
+        top = 5 + (shape % 3) * 2
+        left = 5 + (shape // 3) * 2
+        height = 11 + rng.randint(0, 4)
+        width = 7 + rng.randint(0, 4)
+        block = (0.7 + 0.3 * rng.rand(height, width)).astype(np.float32)
+        images[i, 0, top:top + height, left:left + width] = block
+    return images
+
+
+def _make_digit_bundle(n_samples=600, poison_rate=0.05, seed=42, target=TARGET_CLASS):
+    """Digit-like bundle carrying a blended injection attack."""
+    rng = np.random.RandomState(seed)
+    images = _digit_like_batch(rng, n_samples)
+    labels = np.array([i % 10 for i in range(n_samples)])
+    sample_ids = np.arange(n_samples)
+
+    trigger = np.clip(rng.normal(0.5, 0.2, (1, 28, 28)), 0.0, 1.0).astype(np.float32)
+    n_poison = int(round(n_samples * poison_rate))
+    is_poisoned = np.zeros(n_samples, dtype=bool)
+
+    if n_poison > 0:
+        candidates = np.where(labels != target)[0]
+        for idx in rng.choice(candidates, n_poison, replace=False):
+            images[idx] = np.clip(
+                (1 - ALPHA) * images[idx] + ALPHA * trigger, 0.0, 1.0)
+            labels[idx] = target
+            is_poisoned[idx] = True
+
+    bundle = ImageInputBundle(images=images, labels=labels, sample_ids=sample_ids)
+    return bundle, is_poisoned
+
+
+class TestBackgroundLift(unittest.TestCase):
+    """The second signature, for datasets whose images resemble one another.
+
+    The shared-pattern approach needs images to be individually distinctive.
+    Handwritten digits are not, so a different tell is needed: a true black
+    background cannot survive having noise blended into it.
+    """
+
+    def test_finds_the_targeted_class(self):
+        for target in (0, 4, 7):
+            with self.subTest(target=target):
+                bundle, truth = _make_digit_bundle(poison_rate=0.05, target=target)
+                result = scan_background_lift(bundle)
+                self.assertEqual(result["target_class"], target)
+                caught = np.sum(result["flags"] & truth)
+                self.assertGreater(caught / np.sum(truth), 0.90)
+
+    def test_no_false_positives(self):
+        bundle, truth = _make_digit_bundle(poison_rate=0.05)
+        flags = scan_background_lift(bundle)["flags"]
+        self.assertEqual(int(np.sum(flags & ~truth)), 0)
+
+    def test_clean_data_reports_no_target(self):
+        bundle, _ = _make_digit_bundle(poison_rate=0.0)
+        result = scan_background_lift(bundle)
+        self.assertIsNone(result["target_class"])
+        self.assertEqual(int(result["flags"].sum()), 0)
+
+    def test_stands_down_without_a_dark_background(self):
+        """Photographs have no reliably-zero pixels, so the check must abstain."""
+        bundle, _ = _make_bundle(poison_rate=0.05)
+        result = scan_background_lift(bundle)
+        self.assertEqual(result["background_pixels"], 0)
+        self.assertIsNone(result["target_class"])
+        self.assertEqual(int(result["flags"].sum()), 0)
+
+    def test_works_across_poison_rates(self):
+        for rate in (0.01, 0.03, 0.05, 0.10):
+            with self.subTest(poison_rate=rate):
+                bundle, truth = _make_digit_bundle(n_samples=1000, poison_rate=rate)
+                flags = scan_background_lift(bundle)["flags"]
+                self.assertEqual(int(np.sum(flags & ~truth)), 0)
+                self.assertGreater(np.sum(flags & truth) / np.sum(truth), 0.90)
+
+
+class TestMethodSelection(unittest.TestCase):
+    """One entry point must pick the signature that suits the data."""
+
+    def test_photographs_use_the_shared_pattern(self):
+        bundle, _ = _make_bundle(poison_rate=0.05, target=7)
+        result = scan_all_classes(bundle)
+        self.assertEqual(result["target_class"], 7)
+        self.assertEqual(result["method"], "residual-signature")
+
+    def test_dark_background_data_falls_back(self):
+        bundle, truth = _make_digit_bundle(poison_rate=0.05, target=4)
+        result = scan_all_classes(bundle)
+        self.assertEqual(result["target_class"], 4)
+        self.assertEqual(result["method"], "background-lift")
+        self.assertGreater(np.sum(result["flags"] & truth) / np.sum(truth), 0.90)
+
+    def test_clean_dark_background_data_finds_nothing(self):
+        bundle, _ = _make_digit_bundle(poison_rate=0.0)
+        result = scan_all_classes(bundle)
+        self.assertIsNone(result["target_class"])
+        self.assertEqual(int(result["flags"].sum()), 0)
