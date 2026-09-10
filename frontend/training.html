@@ -22,9 +22,14 @@
     <div id="evaluation-table" class="table-scroll" hidden><table><thead><tr><th>Data</th><th>Known clean</th><th>Known poisoned</th><th>Total</th></tr></thead><tbody id="evaluation-rows"></tbody></table></div>
     <!-- Leila: removal metrics use benchmark truth only, with undefined rates shown as N/A. -->
     <div id="evaluation-metrics" class="evaluation-metrics" hidden>
-      <div><span>Removal precision</span><strong id="evaluation-precision"></strong><p>Of the removed samples, how many were poisoned?</p></div>
+      <!-- Leila: headline clean retention has its own calculation; precision remains below. -->
+      <div><span>Clean-data retention</span><strong id="evaluation-retention"></strong><p>Percentage of clean samples kept for training.</p></div>
       <div><span>Poison recall</span><strong id="evaluation-recall"></strong><p>Of all poisoned samples, how many were removed?</p></div>
     </div>
+    <!-- Leila: retain removal precision as a separate, expandable evaluation metric. -->
+    <details id="precision-details" hidden><summary>More information · Removal precision</summary>
+      <p><strong id="evaluation-precision"></strong> · Percentage of removed samples that were actually poisoned.</p>
+    </details>
     <p id="metric-note" class="help"></p>
     <p id="evaluation-note" class="help"></p>
   </section>
@@ -51,4 +56,4 @@
   <p id="reference-status" class="help"></p>
   <details><summary>More information · saved training results</summary><p id="accuracy-change"></p><p id="comparison-note" class="help"></p><p id="comparison-file" class="help"></p></details>
 </section>
-</main><!-- Leila: refresh the controller to show macro classification metrics. --><script src="/training.js?v=hold-unresolved"></script></body></html>
+</main><!-- Leila: refresh the controller to show macro classification metrics. --><script src="/training.js?v=clean-retention"></script></body></html>

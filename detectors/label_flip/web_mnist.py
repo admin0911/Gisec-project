@@ -51,6 +51,9 @@ def run(feature_path, output_dir, progress):
     assessment = dict(sample_ids=inputs.sample_ids, assessment=states, flags=votes > 0,
         vote_counts={'pixels': votes}, summary={name:int(np.sum(states == name)) for name in
             ('not_flagged', 'uncertain', 'suspected_label_flip')}, settings=config)
+    # Leila: scan the same original pixels after label checks, without changing label votes.
+    from detectors.backdoor.web_patch import scan_patch
+    patch_result, patch_ui = scan_patch(images, assessment, progress)
     rows = []
     for name, result in results.items():
         cutoff = '≥ 0.95 (19/20)' if name == 'knn' else '≥ 0.10' if name == 'class_distance' else 'Cleanlab pruning'
@@ -61,13 +64,13 @@ def run(feature_path, output_dir, progress):
     selected = np.flatnonzero(votes > 0)[:24]
     examples = [dict(sample_id=str(inputs.sample_ids[i]),label=int(inputs.y[i]),
         assessment=str(states[i]),pixel_votes=int(votes[i])) for i in selected]
-    ui = dict(dataset='mnist', samples=len(votes), summary=assessment['summary'], detectors=rows,
+    ui = dict(patch_scan=patch_ui, dataset='mnist', samples=len(votes), summary=assessment['summary'], detectors=rows,
         examples=examples, profile=config['name'],limitation=config['limitation'],
         result_file=str(output/'results.json'),human_review_enabled=True,training_enabled=True)
     if scan_identity((feature_path,), config) != identity:
         raise ValueError('Inputs or settings changed during scanning. Rebuild and retry.')
     full = dict(dataset='mnist',profile=config,feature_files=[str(feature_path)],
-        scans={'pixels':{'detectors':results}},assessment=assessment,ui_result=ui,detector_seconds=timings)
+        patch_scan=patch_result, scans={'pixels':{'detectors':results}},assessment=assessment,ui_result=ui,detector_seconds=timings)
     (output/'results.json').write_text(json.dumps(to_jsonable(full),allow_nan=False),encoding='utf-8')
     save_cache_record(output,identity)
     return to_jsonable(ui)

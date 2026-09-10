@@ -50,6 +50,8 @@
     // Leila: the review controller keeps context and shortens this link to /review.
     const reviewUrl = `/review?job=${encodeURIComponent(jobId)}`;
     get('human-review').href = reviewUrl;
+    // Leila: include patch-only findings in the same review flow.
+    get('review-patches').href = `${reviewUrl}&group=uncertain`;
     // Leila: prepare from this scan and its saved review choices, without starting training.
     get('prepare-training').href = `/train?scan=${encodeURIComponent(jobId)}${imdb ? '&dataset=imdb' : mnist ? '&dataset=mnist' : ''}`;
     get('review-uncertain').href = `${reviewUrl}&group=uncertain`;
@@ -71,9 +73,27 @@
       get('scan-examples').appendChild(p);
     }
     if (!data.examples.length) get('scan-examples').textContent = 'No samples reached the combined review rule.';
-    get('scan-profile').textContent = data.profile;
-    get('scan-limitation').textContent = data.limitation;
-    get('scan-file').textContent = `Saved results: ${data.result_file}`;
+    // Leila: patch evidence is not a fourth vote in the label-flip assessment.
+    const patch = data.patch_scan;
+    get('patch-results').hidden = !patch;
+    // Leila: the relocated details remain hidden for text and older scans without patches.
+    get('patch-details').hidden = !patch;
+    if (patch) {
+      // Leila: presentation only; preserve the detector's existing binary review flags.
+      get('patch-not-flagged').textContent = number(data.samples - patch.flagged);
+      get('patch-needs-review').textContent = number(patch.flagged);
+      for (const pattern of patch.patterns) {
+        const p = document.createElement('p');
+        p.textContent = `${pattern.size} × ${pattern.size} patch · row ${pattern.row+1}, column ${pattern.column+1} · label ${pattern.dominant_label} · ${number(pattern.support)} matches · ${(pattern.purity*100).toFixed(1)}% label agreement`;
+        get('patch-patterns').appendChild(p);
+      }
+      if (!patch.patterns.length) get('patch-patterns').textContent = 'No repeated patches met the detector thresholds.';
+      for (const sample of patch.examples) {
+        const p = document.createElement('p');
+        p.textContent = `${sample.sample_id} · supplied label ${sample.label} · patch score ${sample.score.toFixed(3)}`;
+        get('patch-examples').appendChild(p);
+      }
+    }
     get('scan-result').hidden = false;
     loadReviewSummary();
     if (imdb) {

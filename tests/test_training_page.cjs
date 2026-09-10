@@ -43,6 +43,8 @@ async function page({poisoned=3, removed=9, caught=2, available=true, statuses=[
   p=await page();
   assert.equal(p.nodes['evaluation-precision'].textContent,'22.22%');
   assert.equal(p.nodes['evaluation-recall'].textContent,'66.67%');
+  assert.equal(p.nodes['evaluation-retention'].textContent,'58.82%');
+  assert.equal(p.nodes['precision-details'].hidden,false);
   // Leila: legacy runs must show unavailable metrics instead of invented zero scores.
   assert.deepEqual(p.nodes['comparison-rows'].children[0].children.map(c=>c.textContent),
     ['Clean reference','80.00%','N/A','N/A']);
@@ -66,8 +68,11 @@ async function page({poisoned=3, removed=9, caught=2, available=true, statuses=[
   assert.equal(p.nodes['evaluation-recall'].textContent,'N/A');
   p=await page({poisoned:0,caught:0,removed:0});
   assert.equal(p.nodes['evaluation-precision'].textContent,'N/A');
+  assert.equal(p.nodes['evaluation-retention'].textContent,'100.00%');
   p=await page({poisoned:3,caught:0,removed:0});
   assert.equal(p.nodes['evaluation-recall'].textContent,'0.00%');
+  p=await page({poisoned:20,caught:9,removed:9});
+  assert.equal(p.nodes['evaluation-retention'].textContent,'N/A');
   p=await page({available:false});
   assert.equal(p.nodes['evaluation-metrics'].hidden,true);
 

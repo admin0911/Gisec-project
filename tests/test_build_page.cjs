@@ -34,6 +34,11 @@ function page(hold=false,fail=false) {
     assert.equal(p.nodes.status.textContent,'');assert(p.nodes.result.hidden);assert(p.nodes.progress.hidden);
   }
   p.nodes.attack.value='backdoor';p.nodes.attack.onchange();
+  assert.equal(p.nodes['poison-rate'].value,'0.07');assert(!p.nodes['rate-seven'].disabled);
+  await p.nodes.extract.onclick();
+  assert.equal(p.requests.findLast(r=>r.body).body.poison_rate,.07);
+  assert.equal(p.requests.findLast(r=>r.body).body.attack,'backdoor');
+  p.nodes.attack.value='blended_injection';p.nodes.attack.onchange();
   assert.equal(p.nodes['poison-rate'].value,'0.05');assert(p.nodes['rate-seven'].disabled);
   p=page(true);const pending=p.nodes.extract.onclick();
   // Leila: every build setting is locked, and duplicate clicks cannot start another job.
@@ -50,5 +55,5 @@ function page(hold=false,fail=false) {
   for(const id of ['dataset','encoder','scope','limit','attack','poison-rate','target-label','blend-alpha']) assert.equal(p.nodes[id].disabled,false);
   assert(p.nodes.status.textContent.includes('Error: Build failed'));
   assert.equal(p.nodes.extract.disabled,false);
-  console.log('Passed: 7% label flip, reset on every setting, and stale build completion.');
+  console.log('Passed: 7% label flip and backdoor, reset on every setting, and stale build completion.');
 })().catch(e=>{console.error(e);process.exitCode=1});

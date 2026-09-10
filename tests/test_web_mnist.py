@@ -38,6 +38,10 @@ class WebMNISTTests(unittest.TestCase):
                 result=web_mnist.run(feature,root/'label_flip_scans'/job,lambda *args:None)
             self.assertEqual(result['summary'],dict(not_flagged=27,uncertain=1,suspected_label_flip=2))
             self.assertTrue(result['training_enabled'])
+            self.assertEqual(result['patch_scan']['flagged'],0)
+            self.assertEqual(result['patch_scan']['unique_flagged'],3)
+            saved=json.loads((root/'label_flip_scans'/job/'results.json').read_text())
+            self.assertEqual(saved['patch_scan']['detector_name'],'repeated_patch')
             with patch.object(human_review,'ARTIFACTS',root):
                 restored=human_review.restored_scan_job(job)
                 self.assertEqual(restored['result'],result)

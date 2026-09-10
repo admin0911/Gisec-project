@@ -50,6 +50,8 @@
       const title = document.createElement('h2'); title.textContent = `${item.class_name} · label ${item.label}`;
       const id = document.createElement('p'); id.textContent = item.sample_id;
       const votes = document.createElement('p'); votes.textContent = item.text_votes != null ? `MiniLM ${item.text_votes}/3` : item.pixel_votes != null ? `Pixels ${item.pixel_votes}/3` : `ResNet18 ${item.resnet_votes}/3 · DINOv2 ${item.dino_votes}/3`;
+      // Leila: explain why patch-only samples appear even when label votes are zero.
+      if (item.patch_flagged) votes.textContent += ' · Repeated patch flagged';
       const field = document.createElement('fieldset'), legend = document.createElement('legend'); legend.textContent = 'Your decision'; field.appendChild(legend);
       for (const [value,text] of [['keep','Keep'],['quarantine','Quarantine'],['unsure','Unsure']]) {
         const label = document.createElement('label'), input = document.createElement('input');

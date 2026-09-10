@@ -156,9 +156,9 @@ def run_extraction(job_id: str, request: dict) -> None:
         poison_count = None if poison_count is None else int(poison_count)
         if attack == "none":
             poison_rate = 0.0
-        # Leila: extend label-flip experiments with 7% without changing other attacks.
+        # Leila: allow 7% for label-flip and patch-backdoor experiments.
         allowed_rates = {0.01, 0.03, 0.05, 0.10}
-        if attack == "label_flip": allowed_rates.add(0.07)
+        if attack in {"label_flip", "backdoor"}: allowed_rates.add(0.07)
         if attack != "none" and poison_rate not in allowed_rates:
             choices = ', '.join(f'{rate:.0%}' for rate in sorted(allowed_rates))
             raise ValueError(f"poison_rate must be one of: {choices}")

@@ -192,17 +192,26 @@ def run_scan(feature_file, output_dir, progress):
     probe.write_text('write check',encoding='utf-8')
     probe.unlink()
     scans, assessment, rows = scan_inputs(inputs, progress)
+    # Leila: use verified original image rows for the additional patch stage.
+    from detectors.backdoor.web_patch import scan_patch
+    pixels = ImageInputBundle.load(resnet_path.with_name(resnet_path.name.replace('-features.npz','-images.npz')))
+    # Leila: apply the frozen CIFAR bright-patch profile through the image connector.
+    patch_result, patch_ui = scan_patch(pixels, assessment, progress, dataset="cifar10")
     if scan_identity((resnet_path,dino_path),profile) != identity:
         raise ValueError('Inputs or detector settings changed during scanning. Run a new scan.')
     full = dict(profile=profile, feature_files=[str(resnet_path), str(dino_path)],
-                scans=scans, assessment=assessment)
-    (output_dir / 'results.json').write_text(json.dumps(to_jsonable(full), allow_nan=False), encoding='utf-8')
-    save_cache_record(output_dir,identity)
+                scans=scans, assessment=assessment, patch_scan=patch_result)
     selected = np.flatnonzero(assessment['flags'])[:24]
     examples = [dict(sample_id=str(assessment['sample_ids'][i]), label=to_jsonable(labels[i]),
         assessment=str(assessment['assessment'][i]),
         resnet_votes=int(assessment['vote_counts']['resnet18'][i]),
         dino_votes=int(assessment['vote_counts']['dinov2'][i])) for i in selected]
-    return dict(samples=len(labels), summary=assessment['summary'], detectors=rows,
+    ui = dict(patch_scan=patch_ui, samples=len(labels), summary=assessment['summary'], detectors=rows,
         examples=examples, profile=profile['name'], limitation=profile['limitation'],
         result_file=str(output_dir / 'results.json'), human_review_enabled=False)
+
+    # Leila: persist the same display data for fresh and restored scans.
+    full['ui_result'] = ui
+    (output_dir / 'results.json').write_text(json.dumps(to_jsonable(full), allow_nan=False), encoding='utf-8')
+    save_cache_record(output_dir,identity)
+    return to_jsonable(ui)

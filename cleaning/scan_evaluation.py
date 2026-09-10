@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 from .human_review import record, image_path, _reviews
 from .selection import merge_choices
+from .review_assessment import review_assessment
 
 
 def evaluate_scan(job_id):
@@ -44,7 +45,7 @@ def evaluate_scan(job_id):
         rows.append(metrics(name,detector['flags']))
     # Leila: use exactly the same selection connector as frozen training preparation.
     saved_reviews = _reviews(result_path,digest) if result_path is not None else {'decisions':{}}
-    selection = merge_choices(data['assessment'],saved_reviews,keep_uncertain=False)
+    selection = merge_choices(review_assessment(data),saved_reviews,keep_uncertain=False)
     removed = np.asarray(selection['actions']) != 'keep'
     def counts(mask):
         return dict(clean=int(np.sum(mask & ~truth)),poisoned=int(np.sum(mask & truth)),total=int(np.sum(mask)))

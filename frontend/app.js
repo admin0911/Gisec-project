@@ -20,7 +20,8 @@ function updateAttackOptions() {
   const blended = $('attack').value === 'blended_injection';
   $('target-control').hidden = !blended;
   $('alpha-control').hidden = !blended;
-  const labelFlip = $('attack').value === 'label_flip';
+  // Leila: offer 7% for both label-flip and patch-backdoor builds.
+  const labelFlip = ['label_flip', 'backdoor'].includes($('attack').value);
   $('rate-seven').hidden = !labelFlip; $('rate-seven').disabled = !labelFlip;
   if (!labelFlip && $('poison-rate').value === '0.07') $('poison-rate').value = '0.05';
 }

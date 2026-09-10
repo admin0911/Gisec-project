@@ -118,14 +118,19 @@
       }
       $('evaluation-status').textContent=''; $('evaluation-table').hidden=false;
       // Leila: removed = quarantined + unresolved, including saved human choices.
+      // Leila: retention measures preserved clean rows, independently of removal precision.
+      const retention = data.original.clean ? data.kept.clean / data.original.clean : null;
       const precision = data.removed.total ? data.removed.poisoned / data.removed.total : null;
       const recall = data.original.poisoned ? data.removed.poisoned / data.original.poisoned : null;
       const percent = value => value === null ? 'N/A' : `${(value*100).toFixed(2)}%`;
+      $('evaluation-retention').textContent=percent(retention);
       $('evaluation-precision').textContent=percent(precision);
+      $('precision-details').hidden=false;
       $('evaluation-recall').textContent=percent(recall);
       $('evaluation-metrics').hidden=false;
       $('metric-note').textContent = [
         selectionPolicy?.endsWith('-2of3-v1') ? 'This older preparation kept unreviewed uncertain samples. Prepare a new version to apply the current policy.' : 'Needs review without a human decision is excluded as unresolved. Saved Keep decisions include samples; Quarantine and Unsure exclude them. Original data remains saved.',
+        retention === null ? 'Clean-data retention is N/A because the input contains no known clean samples.' : '',
         precision === null ? 'Precision is N/A because no samples were removed.' : '',
         recall === null ? 'Recall is N/A because the input contains no known poisoned samples.' : ''
       ].filter(Boolean).join(' ');

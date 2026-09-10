@@ -16,6 +16,9 @@ from PIL import Image
 
 ARTIFACTS = Path(__file__).resolve().parents[1] / 'artifacts'
 LOCK = threading.RLock()
+# Leila: one shared review view includes both label and patch findings.
+from .review_assessment import review_assessment
+
 GROUPS = ('uncertain', 'suspected_label_flip')
 CHOICES = ('keep', 'quarantine', 'unsure')
 CLASSES = ('airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -106,7 +109,7 @@ def _reviews(path, digest):
 def review_summary(job_id):
     """Count current saved choices only, without changing detector results or loading images."""
     path, data, digest = record(job_id)
-    a = data['assessment']
+    a = review_assessment(data)
     with LOCK:
         saved = _reviews(path, digest)
     choices = [saved['decisions'].get(str(sid), {}).get('decision')
@@ -120,7 +123,7 @@ def review_page(job_id, group='uncertain', page=0, page_size=20):
     if group not in GROUPS or type(page) is not int or page < 0 or type(page_size) is not int or page_size not in (20,50,100):
         raise ValueError('Choose a valid review group, page and page size (20, 50 or 100).')
     path, data, digest = record(job_id)
-    a = data['assessment']
+    a = review_assessment(data)
     rows = [i for i, state in enumerate(a['assessment']) if state == group]
     pages = max(1, (len(rows) + page_size - 1) // page_size)
     if page >= pages:
@@ -156,6 +159,7 @@ def review_page(job_id, group='uncertain', page=0, page_size=20):
             image=None if imdb else thumbs[sid],text=thumbs[sid] if imdb else None,text_votes=a['vote_counts']['minilm'][i] if imdb else None, resnet_votes=None if (mnist or imdb) else a['vote_counts']['resnet18'][i],
             dino_votes=None if (mnist or imdb) else a['vote_counts']['dinov2'][i],
             pixel_votes=a['vote_counts']['pixels'][i] if mnist else None, decision=saved['decisions'].get(str(sid), {}).get('decision'),
+            patch_flagged=bool(data.get('patch_scan',{}).get('flags',[False]*len(a['sample_ids']))[i]),
             assessment=a['assessment'][i]))
     decisions = [saved['decisions'].get(str(a['sample_ids'][i]), {}).get('decision') for i in rows]
     return dict(items=items, page=page, page_size=page_size, pages=pages, total=len(rows),
@@ -168,7 +172,7 @@ def save_review(job_id, changes, revision):
     if not isinstance(changes, dict) or not 0 < len(changes) <= 100 or type(revision) is not int:
         raise ValueError('Save 1–100 explicit sample choices with a review revision.')
     path, data, digest = record(job_id)
-    a = data['assessment']
+    a = review_assessment(data)
     # Leila: JSON decision keys are strings even for legacy numeric IMDB IDs.
     changes = {str(sid): decision for sid, decision in changes.items()}
     allowed = {str(sid) for sid,state in zip(a['sample_ids'], a['assessment']) if state in GROUPS}
@@ -184,7 +188,7 @@ def save_review(job_id, changes, revision):
             saved['decisions'][sid] = dict(decision=decision, saved_at=now)
         saved['revision'] += 1
         saved['job_id'] = job_id
-        saved['scope'] = 'label_flip_review_only; not yet applied to training or dataset files'
+        saved['scope'] = 'label_flip_and_patch_review; applied only through a new preparation'
         target = path.with_name('human_review.json')
         temporary = target.with_name(f'.human-review-{uuid.uuid4().hex}.tmp')
         try:
@@ -199,8 +203,9 @@ def restored_scan_job(job_id):
     """Recover a completed results page after server restart without rescanning."""
     path, data, _ = record(job_id)
     # Leila: restore the persisted MNIST presentation without assuming two image encoders.
-    if data.get('dataset') in ('mnist','imdb'):
-        return dict(job_id=job_id,status='complete',progress=100,message='Saved MNIST pixel scan loaded',result=data['ui_result'])
+    # Leila: new CIFAR scans also preserve patch presentation in ui_result.
+    if 'ui_result' in data:
+        return dict(job_id=job_id,status='complete',progress=100,message='Saved scan loaded',result=data['ui_result'])
     a = data['assessment']
     rows = []
     for encoder, scan in data['scans'].items():

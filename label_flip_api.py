@@ -56,7 +56,7 @@ def handle_scan_request(handler, jobs, jobs_lock, update_job):
             def progress(step, message):
                 update_job(job_id, status='running', progress=round(step / 7 * 100), message=message)
             result = run_scan(feature_file, ARTIFACTS / 'label_flip_scans' / job_id, progress)
-            update_job(job_id, status='complete', progress=100, message='Label-flip scan complete', result=result)
+            update_job(job_id, status='complete', progress=100, message='Scan complete', result=result)
         except Exception as exc:
             update_job(job_id, status='error', progress=0, message=str(exc))
         finally:

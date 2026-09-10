@@ -33,7 +33,8 @@ def prepare_dataset(scan_id):
         reviews = deepcopy(human_review._reviews(scan_path,digest))
     dataset = scan.get('dataset','cifar10')
     if dataset not in ('mnist','cifar10','imdb'): raise ValueError('Unsupported training dataset.')
-    selection = merge_choices(scan['assessment'],reviews,keep_uncertain=False)
+    # Leila: use the same combined review connector as the review page.
+    selection = merge_choices(human_review.review_assessment(scan),reviews,keep_uncertain=False)
     source = human_review.text_feature_path(scan) if dataset=='imdb' else human_review.image_path(scan)
     original_hash = file_hash(source)
     with np.load(source,allow_pickle=False) as images:

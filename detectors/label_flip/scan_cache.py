@@ -26,6 +26,8 @@ def scan_identity(paths, profile):
             inputs.append((str(path.resolve()),digest_file(path)))
     root = Path(__file__).resolve().parents[2]
     sources = sorted((root/'detectors'/'label_flip').glob('*.py'))
+    # Leila: invalidate cached image scans when patch scanning changes.
+    sources += sorted((root/'detectors'/'backdoor').glob('*.py'))
     sources += [root/'detectors'/'output_connector.py']
     sources += sorted((root/'poison_features').glob('*.py'))
     # Leila: the MNIST adapter reuses the tested pixel experiment's scoring functions.

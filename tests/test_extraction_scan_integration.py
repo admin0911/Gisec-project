@@ -80,8 +80,13 @@ class ExtractionIntegrationTests(unittest.TestCase):
                             np.testing.assert_array_equal(images.images,dataset.tensors[0].numpy())
                     self.assertEqual(len(set(paths)),3)
                     self.assertEqual(encoder.call_count,2)  # Label flips reuse both clean encoders.
+                    # Leila: 7% patches are supported and must be re-encoded, unlike label flips.
+                    patched=run('backdoor-seven','backdoor',.07)
+                    patch_pixels=ImageInputBundle.load(patched['representations'][0]['image_file'])
+                    self.assertEqual(int(np.all(patch_pixels.images[:,:,-3:,-3:]==1,axis=(1,2,3)).sum()),7)
+                    self.assertEqual(encoder.call_count,4)
                     server.JOBS['unsupported']={}
-                    server.run_extraction('unsupported',dict(dataset='cifar10',attack='backdoor',poison_rate=.07))
+                    server.run_extraction('unsupported',dict(dataset='cifar10',attack='backdoor',poison_rate=.08))
                     self.assertEqual(server.JOBS.pop('unsupported')['status'],'error')
             finally:
                 os.chdir(previous)

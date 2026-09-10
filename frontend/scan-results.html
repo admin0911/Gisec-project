@@ -10,7 +10,7 @@
 </head>
 <body><main class="scan-page">
   <!-- Leila: compact navigation and a separate progress panel for the results view. -->
-  <nav aria-label="Page navigation"><a href="/">← Prepare dataset</a><span class="page-badge">LABEL-FLIP ANALYSIS</span></nav>
+  <nav aria-label="Page navigation"><a href="/">← Prepare dataset</a><!-- Leila: this page includes label-flip and patch scans. --><span class="page-badge">DATA POISONING ANALYSIS</span></nav>
   <p class="eyebrow">POISONGUARD / LABEL-FLIP SCAN</p>
   <h1>Scan results</h1>
   <!-- Leila: describe pixel or encoder checks after the result identifies its dataset. -->
@@ -24,6 +24,8 @@
     <p id="scan-summary"></p>
     <!-- Leila: text benchmark truth is shown only after scanning. -->
     <p id="imdb-evaluation" class="help" hidden></p>
+    <!-- Leila: these cards describe label-flip results only. -->
+    <h2>Label-flip findings</h2>
     <div class="assessment-grid">
       <!-- Leila: requested display labels; counts still represent detector assessments. -->
       <article class="clean"><span>Clean</span><strong id="not-flagged"></strong><p id="clean-explanation">Not flagged by either encoder’s combined rule. This does not guarantee clean data.</p></article>
@@ -31,6 +33,18 @@
       <article class="uncertain"><a id="review-uncertain" class="review-card" href="#"><span>Needs review</span><strong id="uncertain"></strong><p id="uncertain-explanation">The encoders disagree. Only one reaches two detector votes.</p></a></article>
       <article class="suspected"><a id="review-suspected" class="review-card" href="#"><span>Poisoned data</span><strong id="suspected"></strong><p id="suspected-explanation">Suspected poisoning, not confirmed. Both encoders reach at least two detector votes.</p></a></article>
     </div>
+    <!-- Leila: patch evidence is separate from the label-voting assessment. -->
+    <section id="patch-results" hidden>
+      <!-- Leila: name the supported bright-patch scope explicitly. -->
+      <h2>Backdoor findings · Repeated bright-patch detection</h2>
+      <!-- Leila: reuse the label-flip card styles; patch flags request review only. -->
+      <div class="assessment-grid">
+        <article class="clean"><span>Clean</span><strong id="patch-not-flagged"></strong><p>No suspicious repeated patch was flagged. This does not guarantee clean data.</p></article>
+        <!-- Leila: patch flags open the shared review queue. -->
+        <article class="uncertain"><a id="review-patches" class="review-card" href="#"><span>Needs review</span><strong id="patch-needs-review"></strong><p>These samples match a suspicious repeated patch. Review is needed.</p></a></article>
+        <article class="suspected"><span>Poisoned data</span><strong>—</strong><p>This detector does not confirm poisoning. Flagged samples appear under Needs review.</p></article>
+      </div>
+    </section>
     <!-- Leila: review is optional and appears only once scan results are ready. -->
     <p><a id="human-review" class="review-primary" href="#">Human review →</a></p>
     <!-- Leila: show saved human choices below the review button, separate from detector counts. -->
@@ -43,18 +57,19 @@
       </div>
     </div>
     <!-- Leila: keep individual detector results collapsed until the user expands them. -->
-    <details><summary>More information · Individual detector results</summary>
+    <details><summary>More information · Label-flip individual detector results</summary>
       <div class="table-scroll"><table><thead><tr><th>Features</th><th>Detector</th><th>Flagged</th><th>Rate</th><th>Flag rule</th></tr></thead><tbody id="detector-rows"></tbody></table></div>
     </details>
-    <details><summary>More information · sample findings</summary>
+    <details><summary>More information · Label-flip sample findings</summary>
       <p class="help">Up to 24 flagged sample IDs in dataset order. All scores and decisions are saved in the results file.</p>
       <div id="scan-examples"></div>
     </details>
-    <details><summary>More information · thresholds and saved results</summary>
-      <p id="scan-profile"></p><p id="scan-limitation" class="help"></p><p id="scan-file" class="help"></p>
+    <!-- Leila: group patch details with the label-flip details, without extra summary paragraphs. -->
+    <details id="patch-details" hidden><summary>More information · Backdoor patches and sample findings</summary>
+      <div id="patch-patterns"></div><div id="patch-examples"></div>
     </details>
     <!-- Leila: continue to training preparation after the completed scan and optional review. -->
     <p style="margin-top:28px"><a id="prepare-training" class="review-primary" href="#">Prepare training dataset →</a></p>
   </section>
 <!-- Leila: refresh the results controller to show current saved reviews after returning. -->
-</main><!-- Leila: use the short human review links. --><script src="/scan-results.js?v=imdb-review-training"></script></body></html>
+</main><!-- Leila: use the short human review links. --><script src="/scan-results.js?v=combined-review"></script></body></html>
