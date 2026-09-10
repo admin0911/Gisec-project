@@ -40,28 +40,28 @@ class PreparationTests(unittest.TestCase):
     def test_snapshot_policy_and_later_reviews(self):
         original = preparation.file_hash(self.source)
         prepared = preparation.prepare_dataset(self.job)
-        self.assertEqual(prepared['summary'],dict(kept=11,quarantined=5,unresolved=4,total=20))
+        self.assertEqual(prepared['summary'],dict(kept=11,quarantined=8,unresolved=1,total=20))
         manifest = preparation.load_preparation(prepared['version'])
         self.assertEqual(manifest['actions'][10:14],['keep','quarantine','human_review','quarantine'])
         self.assertEqual(manifest['reasons'][13],'scanner_suspected')
-        self.assertEqual(prepared['policy_version'],'3.0-hold-unresolved')
+        self.assertEqual(prepared['policy_version'],'4.0-quarantine-unreviewed')
         human_review.save_review(self.job,{self.ids[13]:'keep'},1)
         self.assertEqual(preparation.load_preparation(prepared['version'])['summary']['kept'],11)
         latest = preparation.prepare_dataset(self.job)
         self.assertNotEqual(latest['version'],prepared['version'])
         self.assertEqual(latest['summary']['kept'],12)
-        self.assertEqual(latest['summary']['quarantined'],4)
-        self.assertEqual(preparation.load_preparation(prepared['version'])['summary']['quarantined'],5)
+        self.assertEqual(latest['summary']['quarantined'],7)
+        self.assertEqual(preparation.load_preparation(prepared['version'])['summary']['quarantined'],8)
         self.assertEqual(preparation.file_hash(self.source),original)
 
     def test_no_reviews_quarantines_suspects_and_holds_uncertain(self):
         selection = preparation.merge_choices(self.assessment,{'decisions':{}})
-        self.assertEqual(selection['summary'],dict(kept=10,quarantined=5,unresolved=5,total=20))
+        self.assertEqual(selection['summary'],dict(kept=10,quarantined=10,unresolved=0,total=20))
 
     def test_human_unsure_overrides_suspect_and_legacy_policy_is_preserved(self):
         selection = preparation.merge_choices(self.assessment,{'decisions':{
             self.ids[11]:{'decision':'unsure'}, self.ids[13]:{'decision':'keep'}}})
-        self.assertEqual(selection['summary'],dict(kept=11,quarantined=3,unresolved=6,total=20))
+        self.assertEqual(selection['summary'],dict(kept=11,quarantined=8,unresolved=1,total=20))
         self.assertEqual(selection['reasons'][11],'human_unsure')
         data = preparation.prepare_dataset(self.job)
         del data['policy_version']

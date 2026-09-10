@@ -36,8 +36,10 @@ def run(path,output,progress):
     stages=[('knn',KNNLabelAgreement(k=20,threshold=.95)),('class_distance',ClassDistance(threshold=.1)),('confident_learning',ConfidentLearning(folds=5,seed=2026))]
     with threadpool_limits(limits=4):
         for index,(name,detector) in enumerate(stages,1):
-            progress(index*2,f'{index} of {4 if text_path.exists() else 3}: {name}')
-            raw=detector.analyze(inputs)
+            # Leila: label checks have their own count, separate from phrase scanning.
+            heading=f'Stage 1 of 3 · Label-flip checks\nCheck {index} of {len(stages)} · {name} — MiniLM'
+            progress(index*2,heading)
+            raw=detector.analyze(inputs,progress=lambda message:progress(index*2,heading+'\n'+message)) if name=='confident_learning' else detector.analyze(inputs)
             result=detector_result(name,'1.0',raw,dict(config,representation='raw_minilm',threshold_status='provisional'),expected_sample_ids=inputs.sample_ids)
             result['evidence'].pop('neighbour_sample_ids',None)
             results[name]=result
@@ -59,7 +61,7 @@ def run(path,output,progress):
         text_inputs=TextInputBundle.load(text_path)
         if not np.array_equal(text_inputs.sample_ids,inputs.sample_ids) or not np.array_equal(text_inputs.labels,inputs.y):
             raise ValueError('Review text and feature rows differ; rebuild the dataset.')
-        progress(6.5,'4 of 4: repeated phrase scanning')
+        progress(6.5,'Stage 2 of 3 · Backdoor checks\nCheck 1 of 1 · Repeated phrases')
         phrase_result=RepeatedPhraseDetector().analyze(text_inputs)
         ui['phrase_scan']=dict(flagged=int(phrase_result['flags'].sum()),patterns=phrase_result['evidence']['patterns'])
     # Leila: verified phrase builds now support the shared training comparison.

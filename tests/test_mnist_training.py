@@ -13,7 +13,7 @@ class MNISTTrainingTests(unittest.TestCase):
     def test_two_of_three_selection(self):
         a=dict(sample_ids=['a','b','c'],assessment=['not_flagged','uncertain','suspected_label_flip'])
         self.assertEqual(merge_choices(a,{'decisions':{}},keep_uncertain=True)['actions'],['keep','keep','quarantine'])
-        self.assertEqual(merge_choices(a,{'decisions':{}},keep_uncertain=False)['actions'],['keep','human_review','quarantine'])
+        self.assertEqual(merge_choices(a,{'decisions':{}},keep_uncertain=False)['actions'],['keep','quarantine','quarantine'])
 
     def test_actual_three_arm_grayscale_training(self):
         torch.set_num_threads(2)

@@ -117,7 +117,7 @@ def train_classifier(train, test, *, model_factory, model_name, num_classes,
             row.update(validation_loss=val_loss/val_count,validation_accuracy=val_correct/val_count)
         history.append(row)
         if progress:
-            progress(f'Epoch {epoch + 1}/{epoch_budget}: loss {row["loss"]:.4f}' + (f' Â· validation loss {row["validation_loss"]:.4f}' if validation is not None else ''))
+            progress(f'Epoch {epoch + 1}/{epoch_budget}: loss {row["loss"]:.4f}' + (f' \u00b7 validation loss {row["validation_loss"]:.4f}' if validation is not None else ''))
     model.eval()
     predictions, targets = [], []
     with torch.inference_mode():

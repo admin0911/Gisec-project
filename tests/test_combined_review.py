@@ -27,7 +27,7 @@ class CombinedReviewTests(unittest.TestCase):
                 saved=human_review._reviews(path,digest)
                 self.assertEqual(merge_choices(review_assessment(scan),saved)['actions'],['keep','human_review','quarantine','keep'])
                 self.assertEqual(scan['assessment']['assessment'][0],'not_flagged')
-                self.assertEqual(merge_choices(review_assessment(scan),{'decisions':{}})['actions'][0],'human_review')
+                self.assertEqual(merge_choices(review_assessment(scan),{'decisions':{}})['actions'][0],'quarantine')
     def test_bad_patch_alignment_rejected(self):
         with self.assertRaises(ValueError):
             review_assessment({'assessment':{'sample_ids':['a']},'patch_scan':{'sample_ids':['b'],'flags':[True]}})

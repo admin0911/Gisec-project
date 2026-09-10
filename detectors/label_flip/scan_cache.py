@@ -33,6 +33,9 @@ def scan_identity(paths, profile):
     sources = sorted((root/'detectors'/'label_flip').glob('*.py'))
     # Leila: invalidate cached image scans when patch scanning changes.
     sources += sorted((root/'detectors'/'backdoor').glob('*.py'))
+    # Leila: MNIST cached results must include the current consensus detector.
+    if any(p.name.startswith('mnist-') for p in paths):
+        sources += sorted((root/'detectors'/'blended_injection').glob('*.py'))
     sources += [root/'detectors'/'output_connector.py']
     sources += sorted((root/'poison_features').glob('*.py'))
     # Leila: the MNIST adapter reuses the tested pixel experiment's scoring functions.

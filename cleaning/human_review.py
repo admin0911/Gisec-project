@@ -168,6 +168,8 @@ def review_page(job_id, group='uncertain', page=0, page_size=20):
             dino_votes=None if (mnist or imdb) else a['vote_counts']['dinov2'][i],
             pixel_votes=a['vote_counts']['pixels'][i] if mnist else None, decision=saved['decisions'].get(str(sid), {}).get('decision'),
             phrase_flagged=bool(data.get('phrase_scan',{}).get('flags',[False]*len(a['sample_ids']))[i]),
+            # Leila: show why a sample entered the combined review queue.
+            blended_flagged=bool(data.get('blended_scan',{}).get('flags',[False]*len(a['sample_ids']))[i]),
             patch_flagged=bool(data.get('patch_scan',{}).get('flags',[False]*len(a['sample_ids']))[i]),
             assessment=a['assessment'][i]))
     decisions = [saved['decisions'].get(str(a['sample_ids'][i]), {}).get('decision') for i in rows]

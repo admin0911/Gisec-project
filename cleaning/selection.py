@@ -27,6 +27,9 @@ def merge_choices(assessment, saved, *, keep_uncertain=False):
         # Leila: quarantine scanner suspects unless a saved Unsure requests review.
         elif state == 'suspected_label_flip' and choice != 'unsure':
             actions.append('quarantine'); reasons.append('scanner_suspected')
+        # Leila: unreviewed flags from any detector are quarantined by default.
+        elif choice is None:
+            actions.append('quarantine'); reasons.append('flagged_unreviewed_quarantine')
         else:
             actions.append('human_review'); reasons.append('human_unsure' if choice == 'unsure' else 'flagged_unreviewed')
     return dict(sample_ids=ids, actions=actions, reasons=reasons,

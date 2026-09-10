@@ -142,7 +142,8 @@ def scan_inputs(inputs, progress):
                 step = encoder_index * 3 + int(local_step)
             else:
                 detail = f'{encoder}: {message}'
-            progress(step, f'{step} of 6: {detail}')
+            # Leila: count label checks separately from the later backdoor stage.
+            progress(step, f'Stage 1 of 3 · Label-flip checks\nCheck {step} of 6 · {detail}')
 
         with threadpool_limits(limits=4):
             scans[encoder] = scan_calibrated_label_flips(inputs[encoder], encoder=encoder, progress=report)

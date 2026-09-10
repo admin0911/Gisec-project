@@ -94,7 +94,7 @@ def train_comparison(version, epochs, output, progress, *, seed=42, matched_step
         def update(message):
             match = re.search(r'Epoch (\d+)/',message)
             epoch = int(match[1]) if match else 0
-            progress(5+index*step+min(step-2,int((step-2)*epoch/epochs)),f'Model {index+1} of {len(arms)} Â· {message}')
+            progress(5+index*step+min(step-2,int((step-2)*epoch/epochs)),f'Model {index+1} of {len(arms)} \u00b7 {message}')
         run = train_classifier(inputs,test,model_factory=(lambda: small_cnn(channels=1)) if dataset=='mnist' else small_cnn,model_name='small_cnn_mnist_v1' if dataset=='mnist' else 'small_cnn_v1',num_classes=10,
                                output_root=output/name,config=config,progress=update,validation=validation)
         report['runs'][name] = run

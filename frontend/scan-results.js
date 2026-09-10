@@ -75,6 +75,26 @@
     }
     if (!data.examples.length) get('scan-examples').textContent = 'No samples reached the combined review rule.';
     // Leila: patch evidence is not a fourth vote in the label-flip assessment.
+    // Leila: display the MNIST-only connector result independently of label voting.
+    if (get('blended-results')) {
+      const blend=data.blended_scan;
+      get('blended-results').hidden=!blend;
+      // Leila: the moved details are independent of the findings section.
+      if (get('blended-details')) get('blended-details').hidden=!blend;
+      get('blended-availability').textContent=blend?'Stage 3 · Blended-injection checks: '+(blend.applicable?'Completed':'Inconclusive'):'Blended-injection check not run for this saved scan.';
+      if(blend) {
+        get('blended-counts').hidden=!blend.applicable;
+        // Leila: only show the status paragraph when this check is inconclusive.
+        get('blended-status').hidden=blend.applicable;
+        get('blended-status').textContent=blend.applicable?'':'Inconclusive: too few consensus pixels. This check cannot assess this input.';
+        get('blended-not-flagged').textContent=number(data.samples-blend.flagged);
+        get('blended-flagged').textContent=number(blend.flagged);
+        get('review-blended').href=`${reviewUrl}&group=uncertain`;
+        get('blended-settings').textContent=`Consensus pixels: ${blend.consensus_pixel_count}. Score is the fraction disturbed, not a probability. Consensus: ${blend.settings.consensus}; tolerance: ${blend.settings.tolerance}; flag when score > ${blend.settings.flag_fraction}.`;
+        get('blended-examples').replaceChildren();
+        for(const sample of blend.examples) {const p=document.createElement('p');p.textContent=`${sample.sample_id} · label ${sample.label} · score ${sample.score.toFixed(3)}`;get('blended-examples').appendChild(p);}
+      }
+    }
     const patch = data.patch_scan;
     get('patch-results').hidden = !patch;
     // Leila: the relocated details remain hidden for text and older scans without patches.

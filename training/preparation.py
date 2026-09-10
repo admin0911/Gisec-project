@@ -63,7 +63,7 @@ def prepare_dataset(scan_id):
     manifest = dict(schema_version='1.0',version=version,scan_id=scan_id,scan_sha256=digest,
         created_at=datetime.now(timezone.utc).isoformat(),dataset=dataset,source_images=str(source),
         source_sha256=original_hash,review_revision=reviews['revision'],review_snapshot=reviews['decisions'],
-        policy_version='3.0-hold-unresolved',
+        policy_version='4.0-quarantine-unreviewed',
         policy='human_choices_override; keep_unflagged; quarantine_suspected; hold_uncertain_or_unsure',
         class_counts=np.bincount(labels[kept].astype(int),minlength=2 if dataset=='imdb' else 10).tolist(),**selection)
     out = PREPARATIONS/version

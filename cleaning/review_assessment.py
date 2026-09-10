@@ -7,16 +7,21 @@ def review_assessment(scan):
     assessment = deepcopy(scan['assessment'])
     # Leila: text phrase and image patch flags use the same unresolved-review policy.
     patch = scan.get('phrase_scan') if scan.get('dataset') == 'imdb' else scan.get('patch_scan')
-    if patch is None:
-        return assessment
     ids = np.asarray(assessment['sample_ids'])
-    flags = np.asarray(patch['flags'])
-    if (not np.array_equal(ids, patch['sample_ids']) or flags.shape != ids.shape
-            or flags.dtype.kind != 'b'):
-        raise ValueError('Patch review flags must match the label-flip sample IDs')
-    states = np.asarray(assessment['assessment'], dtype='<U24').copy()
-    # Leila: patch-only flags request review; preserve existing suspected/quarantine routing.
-    states[flags & (states == 'not_flagged')] = 'uncertain'
+    states = None
+    # Leila: independent MNIST noise flags join review without adding label votes.
+    blended = scan.get('blended_scan') if scan.get('dataset') == 'mnist' else None
+    for detector in (patch, blended):
+        if detector is None: continue
+        flags = np.asarray(detector['flags'])
+        if (not np.array_equal(ids, detector['sample_ids']) or flags.shape != ids.shape
+                or flags.dtype.kind != 'b'):
+            raise ValueError('Patch review flags must match the label-flip sample IDs')
+        if states is None: states = np.asarray(assessment['assessment'], dtype='<U24').copy()
+        if detector is blended and not detector.get('evidence',{}).get('applicable',False):
+            continue  # Inconclusive is not evidence to keep or quarantine samples.
+        states[flags & (states == 'not_flagged')] = 'uncertain'
+    if states is None: return assessment
     assessment['assessment'] = states.tolist()
     assessment['flags'] = (states != 'not_flagged').tolist()
     assessment['summary'] = {name:int(np.sum(states == name)) for name in

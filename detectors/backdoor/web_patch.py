@@ -13,9 +13,9 @@ def scan_patch(images, label_assessment, progress, *, dataset="mnist"):
         raise ValueError("Unsupported patch scan dataset")
     if not np.array_equal(images.sample_ids, label_assessment['sample_ids']):
         raise ValueError('Patch pixels and label-flip assessment IDs must match')
-    progress(6, 'Checking repeated patches after label-flip scanning')
+    progress(6, 'Stage 2 of 3 · Backdoor checks\nCheck 1 of 1 · Repeated patches')
     def report(done, total):
-        progress(6 + .9 * done / total, f'Patch scan: {done} of {total} positions checked')
+        progress(6 + .9 * done / total, f'Stage 2 of 3 · Backdoor checks\nCheck 1 of 1 · Repeated patches\n{done} of {total} positions checked')
     # Leila: preserve MNIST defaults and record the CIFAR profile in connector settings.
     settings = CIFAR_PATCH_SETTINGS if dataset == "cifar10" else {}
     result = RepeatedPatchDetector(**settings).analyze(images, progress=report)

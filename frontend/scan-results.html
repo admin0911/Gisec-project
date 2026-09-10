@@ -16,10 +16,13 @@
   <!-- Leila: describe pixel or encoder checks after the result identifies its dataset. -->
   <p id="scan-description" class="lede">Checking the selected dataset.</p>
   <div class="scan-progress-panel">
-  <p id="scan-status" role="status" aria-live="polite">Loading scan…</p>
+  <!-- Leila: show stage, detector count and internal progress on separate lines. -->
+  <p id="scan-status" style="white-space:pre-line" role="status" aria-live="polite">Loading scan…</p>
   <progress id="scan-progress" value="0" max="100" aria-label="Scan progress"></progress>
   <!-- Leila: Keep the scan timing hint concise. -->
   <p class="help">Full scans can take several minutes.</p>
+  <!-- Leila: no blended detector is connected yet; do not imply it ran. -->
+  <p id="blended-availability" class="help">Blended-injection checks are available for MNIST only.</p>
   </div>
   <section id="scan-result" hidden>
     <p id="scan-summary"></p>
@@ -43,7 +46,7 @@
         <article class="clean"><span>Clean</span><strong id="patch-not-flagged"></strong><p>No suspicious repeated patch was flagged. This does not guarantee clean data.</p></article>
         <!-- Leila: patch flags open the shared review queue. -->
         <article class="uncertain"><a id="review-patches" class="review-card" href="#"><span>Needs review</span><strong id="patch-needs-review"></strong><p>These samples match a suspicious repeated patch. Review is needed.</p></a></article>
-        <article class="suspected"><span>Poisoned data</span><strong>—</strong><p>This detector does not confirm poisoning. Flagged samples appear under Needs review.</p></article>
+        <article class="suspected"><span>Poisoned data</span><strong>0</strong><p>This detector does not confirm poisoning. Flagged samples appear under Needs review.</p></article>
       </div>
     </section>
     <!-- Leila: show text backdoor findings separately from label-flip votes. -->
@@ -52,8 +55,20 @@
       <div class="assessment-grid">
         <article class="clean"><span>Clean</span><strong id="phrase-not-flagged"></strong><p>No suspicious repeated phrase was flagged. This does not guarantee clean data.</p></article>
         <article class="uncertain"><a id="review-phrases" class="review-card" href="#"><span>Needs review</span><strong id="phrase-needs-review"></strong><p>These reviews match a suspicious repeated phrase. Review is needed.</p></a></article>
-        <article class="suspected"><span>Poisoned data</span><strong>—</strong><p>This detector does not confirm poisoning. Flagged reviews appear under Needs review.</p></article>
+        <article class="suspected"><span>Poisoned data</span><strong>0</strong><p>This detector does not confirm poisoning. Flagged reviews appear under Needs review.</p></article>
       </div>
+    </section>
+    <!-- Leila: group all finding cards above Human review. -->
+    <!-- Leila: unavailable consensus evidence must never look like a clean result. -->
+    <section id="blended-results" hidden><h2>Blended-injection findings · MNIST consensus pixels</h2>
+      <p id="blended-status"></p>
+      <div id="blended-counts" class="assessment-grid" hidden>
+        <article class="clean"><span>Not flagged</span><strong id="blended-not-flagged"></strong><p>No consensus-pixel anomaly detected; this does not guarantee clean data.</p></article>
+        <article class="uncertain"><a id="review-blended" class="review-card" href="#"><span>Needs review</span><strong id="blended-flagged"></strong><p>Unusual background changes. These can also be harmless.</p></a></article>
+        <!-- Leila: this detector requests review; no automatic quarantine rule is configured. -->
+        <article class="suspected"><span>Quarantined</span><strong>0</strong><p>No samples automatically quarantined by this detector.</p></article>
+      </div>
+
     </section>
     <!-- Leila: review is optional and appears only once scan results are ready. -->
     <p><a id="human-review" class="review-primary" href="#">Human review →</a></p>
@@ -78,6 +93,8 @@
     <details id="patch-details" hidden><summary>More information · Backdoor patches and sample findings</summary>
       <div id="patch-patterns"></div><div id="patch-examples"></div>
     </details>
+    <!-- Leila: consensus evidence stays with the expandable details. -->
+      <details id="blended-details" hidden><summary>More information · Consensus-pixel findings</summary><p id="blended-settings"></p><div id="blended-examples"></div></details>
     <!-- Leila: place phrase evidence alongside the other expandable detector details. -->
     <details id="phrase-details" hidden><summary>More information · Backdoor phrases and sample findings</summary><div id="phrase-patterns"></div></details>
     <!-- Leila: continue to training preparation after the completed scan and optional review. -->
@@ -85,4 +102,4 @@
     <p style="margin-top:28px"><a id="prepare-training" class="review-primary" href="#">Prepare dataset &amp; view results →</a></p>
   </section>
 <!-- Leila: refresh the results controller to show current saved reviews after returning. -->
-</main><!-- Leila: use the short human review links. --><script src="/scan-results.js?v=imdb-training"></script></body></html>
+</main><!-- Leila: use the short human review links. --><script src="/scan-results.js?v=consensus-quarantine"></script></body></html>

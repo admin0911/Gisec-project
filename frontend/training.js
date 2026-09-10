@@ -141,7 +141,8 @@
     try {
       const data = await api('job',{job_id:job});
       if (data.version !== version) throw new Error('This training job belongs to a different prepared dataset.');
-      $('training-status').textContent = data.message;
+      // Leila: repair legacy separators from the server already running in memory.
+      $('training-status').textContent = String(data.message || '').replace(/\u00c2\u00b7/g, '\u00b7');
       $('training-progress').value = data.progress;
       if (data.status==='error') throw new Error(data.message);
       if (data.status==='complete') { renderComparison(data.result); active=false; $('train').disabled=false; $('epochs').disabled=false; if ($('training-mode')) $('training-mode').disabled=false; return; }
@@ -193,7 +194,7 @@
       $('evaluation-recall').textContent=percent(recall);
       $('evaluation-metrics').hidden=false;
       $('metric-note').textContent = [
-        selectionPolicy?.endsWith('-2of3-v1') ? 'This older preparation kept unreviewed uncertain samples. Prepare a new version to apply the current policy.' : 'Needs review without a human decision is excluded as unresolved. Saved Keep decisions include samples; Quarantine and Unsure exclude them. Original data remains saved.',
+        selectionPolicy?.endsWith('-2of3-v1') ? 'This older preparation kept unreviewed uncertain samples. Prepare a new version to apply the current policy.' : selectionPolicy === '4.0-quarantine-unreviewed' ? 'Unreviewed flagged samples are quarantined. Saved Keep decisions include samples; explicit Unsure decisions remain unresolved and excluded. Original data remains saved.' : 'This saved preparation uses the earlier review policy. Prepare a new version to quarantine unreviewed flags.',
         retention === null ? 'Clean-data retention is N/A because the input contains no known clean samples.' : '',
         precision === null ? 'Precision is N/A because no samples were removed.' : '',
         recall === null ? 'Recall is N/A because the input contains no known poisoned samples.' : ''
