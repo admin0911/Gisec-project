@@ -63,10 +63,12 @@ The frontend's **Extraction scope** controls workload:
   row in the selected training split. The API equivalent is
   `{"full_training": true}`.
 
-Choose **Clean**, **Label flip**, **Backdoor patch**, or **Blended noise
-injection**. For attacks, use only the provided 1%, 3%, 5%, or 10% poison
-rates. <!-- Leila: document the additional label-flip experiment rate. -->
-Label flipping also supports 7%. Clean runs have no poisoned rows. Blended injection uses a shared
+Choose **Clean**, **Random label flip**, **Targeted label flip**, **Backdoor
+patch**, or **Blended noise injection**. For attacks, use only the provided
+1%, 3%, 5%, 7%, or 10% poison rates where supported. Clean runs have no
+poisoned rows. Targeted label flip selects poisoned rows only from the
+configured source class and changes them to the configured target class;
+source and target must differ. Blended injection uses a shared
 low-amplitude noise pattern, default `alpha=0.10`, and target label `0`
 (airplane for CIFAR-10); a full 3% CIFAR-10 run is approximately 1,500 rows.
 Completed image runs create matching `*-features.npz` and
@@ -84,8 +86,8 @@ them. The two runs are saved as separate artifacts because their feature
 spaces are not interchangeable. DINOv2 downloads its pretrained weights on
 first use and requires internet access then.
 
-Label-flip runs reuse matching clean feature and image artifacts and only
-replace labels plus evaluation metadata. Pixel-changing attacks such as
+Random and targeted label-flip runs reuse matching clean feature and image
+artifacts and only replace labels plus evaluation metadata. Pixel-changing attacks such as
 backdoors and blended injection must be re-encoded.
 
 The feature bundle and image bundle use the same stable `sample_ids`.

@@ -10,6 +10,7 @@ function updateAttackOptions() {
   $('encoder-control').hidden = true;
   // Leila: enable the verified phrase-backdoor build for IMDB.
   const textDataset = $('dataset').value === 'imdb';
+  const cifarDataset = $('dataset').value === 'cifar10';
   for (const option of $('attack').options) {
     option.hidden = textDataset && !['none','label_flip','backdoor'].includes(option.value);
     option.disabled = option.hidden;
@@ -18,16 +19,32 @@ function updateAttackOptions() {
   if (textDataset && !['none','label_flip','backdoor'].includes($('attack').value)) $('attack').value='none';
   $('attack').disabled = false;
   $('poison-rate').disabled = $('attack').value === 'none';
+  const targeted = $('attack').value === 'targeted_label_flip';
   const blended = $('attack').value === 'blended_injection';
-  $('target-control').hidden = !blended;
+  const targetRequired = targeted || blended || $('attack').value === 'backdoor';
+  $('source-control').hidden = !targeted;
+  $('target-control').hidden = !targetRequired;
   $('alpha-control').hidden = !blended;
   // Leila: offer 7% for both label-flip and patch-backdoor builds.
-  const labelFlip = ['label_flip', 'backdoor'].includes($('attack').value);
+  const labelFlip = ['label_flip', 'targeted_label_flip', 'backdoor'].includes($('attack').value);
   $('rate-seven').hidden = !labelFlip; $('rate-seven').disabled = !labelFlip;
   if (!labelFlip && $('poison-rate').value === '0.07') $('poison-rate').value = '0.05';
+  updateWorkflowVisibility();
 }
 $('dataset').onchange = updateAttackOptions;
 $('attack').onchange = updateAttackOptions;
+function updateWorkflowVisibility() {
+  const attack = $('attack').value;
+  const cifar = $('dataset').value === 'cifar10';
+  const labelFlip = ['label_flip', 'targeted_label_flip'].includes(attack);
+  const blended = attack === 'blended_injection' && cifar;
+  $('label-flip-controls').hidden = !labelFlip;
+  $('blended-controls').hidden = !blended;
+  if (!blended) $('blended-result').hidden = true;
+  if (!labelFlip) {
+    $('last-scan').hidden = true;
+  }
+}
 $('scope').onchange = () => {
   const fullTraining = $('scope').value === 'full';
   $('sample-control').hidden = fullTraining;
@@ -82,6 +99,7 @@ $('extract').onclick = async () => {
         limit: Number($('limit').value),
         attack: $('attack').value,
         poison_rate: Number($('poison-rate').value),
+        source_label: Number($('source-label').value),
         target_label: Number($('target-label').value),
         blend_alpha: Number($('blend-alpha').value)
       })
@@ -101,6 +119,12 @@ $('extract').onclick = async () => {
     if (scanSettings() === extractionSettings) {
       document.dispatchEvent(new CustomEvent('features-ready', {detail: data}));
     }
+    const unifiedPipelineRun = data.attack === 'blended_injection' && data.detectors?.blended_injection;
+    $('last-scan').href = unifiedPipelineRun
+      ? `/scan?job=${encodeURIComponent(job.job_id)}`
+      : '/scan';
+    $('last-scan').textContent = unifiedPipelineRun ? 'View unified results' : 'Run label-flip scan to view results';
+    $('last-scan').hidden = !unifiedPipelineRun;
     // Leila: a pixels-only build has no encoder/PCA plot to display.
     $('result').hidden = false;
     $('plot').hidden = !!data.pixels_only;

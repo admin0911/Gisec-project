@@ -25,6 +25,27 @@ class ModalityTests(unittest.TestCase):
         self.assertEqual(len(poisoned.metadata.current_labels), 10)
         self.assertTrue(np.all(poisoned.metadata.poison_type[~poisoned.metadata.is_poisoned] == "clean"))
 
+    def test_targeted_label_flip_only_changes_source_class(self):
+        import torch
+
+        dataset = [(torch.zeros(1, 8, 8), label) for label in [0, 1, 1, 2, 1, 2]]
+        poisoned = poison_dataset(
+            dataset,
+            "targeted_label_flip",
+            poison_rate=2 / 6,
+            source_label=1,
+            target_label=2,
+            seed=4,
+        )
+        poisoned_rows = poisoned.metadata.is_poisoned
+        self.assertEqual(int(poisoned_rows.sum()), 2)
+        self.assertTrue(np.all(poisoned.metadata.original_labels[poisoned_rows] == 1))
+        self.assertTrue(np.all(poisoned.metadata.current_labels[poisoned_rows] == 2))
+        self.assertTrue(np.all(
+            poisoned.metadata.current_labels[~poisoned_rows]
+            == poisoned.metadata.original_labels[~poisoned_rows]
+        ))
+
     def test_packet_bundle_shape_and_finiteness(self):
         records = [
             {"duration": 1, "packet_count": 3, "byte_count": 1000, "protocol": "tcp"},
@@ -92,6 +113,25 @@ class ModalityTests(unittest.TestCase):
         self.assertTrue(all(changed_texts[index] == texts[index] for index in np.flatnonzero(~poisoned)))
         np.testing.assert_array_equal(changed_labels[poisoned], np.ones(2, dtype=np.int64))
         self.assertTrue(np.all(metadata["poison_type"][poisoned] == "backdoor"))
+
+    def test_imdb_targeted_label_flip_keeps_text_and_targets_source_class(self):
+        texts = ["zero", "one", "zero again", "one again"]
+        labels = np.array([0, 1, 0, 1])
+        changed_texts, changed_labels, metadata = poison_texts(
+            texts,
+            labels,
+            attack="targeted_label_flip",
+            poison_rate=0.5,
+            source_label=0,
+            target_label=1,
+            seed=3,
+        )
+        poisoned = metadata["is_poisoned"]
+        self.assertEqual(changed_texts, texts)
+        self.assertEqual(int(poisoned.sum()), 2)
+        self.assertTrue(np.all(metadata["original_labels"][poisoned] == 0))
+        self.assertTrue(np.all(changed_labels[poisoned] == 1))
+        self.assertTrue(np.all(metadata["poison_type"][poisoned] == "targeted_label_flip"))
 
 
 if __name__ == "__main__":

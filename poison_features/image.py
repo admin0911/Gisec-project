@@ -136,7 +136,12 @@ class DINOv2ImageEncoder(ResNet18ImageEncoder):
                 for index in range(start, min(start + batch_size, len(dataset))):
                     item = dataset[index]
                     images.append(self._prepare(item[0] if isinstance(item, (tuple, list)) else item))
-                values = self.model(self.torch.stack(images).to(self.device)).cpu().numpy()
+                # Run each sample independently so reduction kernels cannot
+                # change the embedding by batch size or execution shape.
+                values = self.torch.cat([
+                    self.model(image.unsqueeze(0).to(self.device))
+                    for image in images
+                ]).cpu().numpy()
                 if values.shape != (len(images), 384) or not np.isfinite(values).all():
                     raise RuntimeError("DINOv2 returned invalid features")
                 chunks.append(values.astype(np.float32))

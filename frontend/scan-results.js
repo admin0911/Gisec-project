@@ -31,6 +31,10 @@
     }
   }
   function render(data) {
+    if (data && data.detectors && !Array.isArray(data.detectors) && data.detectors.blended_injection) {
+      renderPipeline(data);
+      return;
+    }
     // Leila: describe the single pixel representation separately from the CIFAR dual encoders.
     const mnist = data.dataset === 'mnist';
     const imdb = data.dataset === 'imdb';
@@ -61,6 +65,12 @@
     get('not-flagged').textContent = number(data.summary.not_flagged);
     get('uncertain').textContent = number(data.summary.uncertain);
     get('suspected').textContent = number(data.summary.suspected_label_flip);
+    const total = Math.max(1, data.samples);
+    requestAnimationFrame(() => {
+      get('bar-clean').style.width = `${data.summary.not_flagged / total * 100}%`;
+      get('bar-uncertain').style.width = `${data.summary.uncertain / total * 100}%`;
+      get('bar-suspected').style.width = `${data.summary.suspected_label_flip / total * 100}%`;
+    });
     for (const row of data.detectors) {
       const tr = document.createElement('tr');
       for (const value of [names[row.encoder], names[row.detector], number(row.flagged), `${(row.rate*100).toFixed(2)}%`, row.threshold_label || `> ${row.threshold.toFixed(4)}`]) {
@@ -146,8 +156,92 @@
       get('imdb-evaluation').textContent=e ? `Demo evaluation · 2 of 3 rule · Precision ${pct(e.precision)} · Recall ${pct(e.recall)} · ${number(e.caught)} of ${number(e.known_poisoned)} poisoned reviews caught · ${number(e.false_positives)} clean reviews flagged. Known identities are used only for evaluation.` : 'Demo evaluation unavailable: no known poison metadata.';
     }
   }
+  function renderPipeline(data) {
+    const detector = data.detectors.blended_injection;
+    const evidence = detector.evidence || {};
+    const flags = detector.flags || [];
+    const flagged = flags.filter(Boolean).length;
+    get('scan-description').textContent = `${data.samples.toLocaleString()} CIFAR-10 samples processed through the detector pipeline.`;
+    get('scan-summary').textContent = 'Extraction complete · applicable detectors complete';
+    get('blended-pipeline-summary').textContent = evidence.target_class === null || evidence.target_class === undefined
+      ? 'No blended-injection signature identified.'
+      : `Strong blended-injection signal detected in target class ${evidence.target_class} · ${flagged.toLocaleString()} samples flagged for review.`;
+    get('pipeline-target').textContent = evidence.target_class ?? 'None';
+    get('pipeline-flagged').textContent = flagged.toLocaleString();
+    get('pipeline-contrast').textContent = Number(evidence.contrast || 0).toFixed(2);
+    get('pipeline-rate').textContent = `${(flagged / Math.max(1, data.samples) * 100).toFixed(2)}%`;
+    get('pipeline-ratio').textContent = Number(evidence.class_ratio || 0).toFixed(2);
+    const contrasts = Object.entries(evidence.class_contrasts || {});
+    const strongest = contrasts.sort((a, b) => Number(b[1]) - Number(a[1]))[0];
+    get('pipeline-strongest').textContent = strongest ? strongest[0] : 'None';
+    drawPipelineChart(contrasts);
+    const examples = get('pipeline-examples');
+    examples.replaceChildren();
+    (detector.top_samples || []).forEach(sample => {
+      const card = document.createElement('figure');
+      card.className = 'pipeline-example';
+      const image = document.createElement('img');
+      image.src = sample.image;
+      image.alt = `Top flagged candidate ${sample.sample_id}`;
+      const caption = document.createElement('figcaption');
+      caption.textContent = `${sample.sample_id} · score ${Number(sample.score).toFixed(3)}`;
+      card.append(image, caption);
+      examples.appendChild(card);
+    });
+    if (!detector.top_samples?.length) examples.textContent = 'No samples were flagged.';
+    get('blended-pipeline-results').hidden = false;
+    get('scan-result').querySelector('.visual-summary').hidden = true;
+    get('review-uncertain').closest('.assessment-grid').hidden = true;
+    get('patch-results').hidden = true;
+    get('scan-result').querySelectorAll(':scope > details').forEach(details => { details.hidden = true; });
+    const reviewJob = data.review_job_id || jobId;
+    const reviewUrl = `/review?job=${encodeURIComponent(reviewJob)}`;
+    get('human-review').href = reviewUrl;
+    get('human-review').hidden = false;
+    get('prepare-training').href = `/train?scan=${encodeURIComponent(reviewJob)}`;
+    get('prepare-training').hidden = false;
+    get('review-saved-status').hidden = false;
+    loadReviewSummaryFor(reviewJob);
+    get('scan-result').hidden = false;
+  }
+  function drawPipelineChart(entries) {
+    const canvas = get('pipeline-contrast-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const max = Math.max(1, ...entries.map(([, value]) => Number(value)));
+    const started = performance.now();
+    function frame(now) {
+      const phase = Math.min(1, (now - started) / 800);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const width = entries.length ? (canvas.width - 80) / entries.length : canvas.width;
+      entries.forEach(([label, value], index) => {
+        const height = Number(value) / max * (canvas.height - 55) * phase;
+        const x = 40 + index * width + width * .18;
+        ctx.fillStyle = String(label) === String(get('pipeline-target').textContent) ? '#d45c67' : '#2b956d';
+        ctx.fillRect(x, canvas.height - 30 - height, width * .64, height);
+        ctx.fillStyle = '#53637b'; ctx.font = '12px Segoe UI';
+        ctx.fillText(label, x + width * .2, canvas.height - 10);
+      });
+      if (phase < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+  function loadReviewSummaryFor(reviewJob) {
+    fetch('/api/review/summary', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({job_id:reviewJob})})
+      .then(response => response.json().then(data => ({response, data})))
+      .then(({response, data}) => {
+        if (!response.ok) throw new Error(data.error || 'Could not load saved reviews.');
+        get('review-saved-status').textContent = data.saved
+          ? `Saved human review · ${number(data.saved)} choices saved · ${number(data.unreviewed)} not yet reviewed`
+          : 'No human review decisions saved yet.';
+        for (const name of ['keep','quarantine','unsure']) get(`saved-${name}`).textContent = number(data[name]);
+        get('review-saved-counts').hidden = !data.saved;
+      })
+      .catch(error => { get('review-saved-status').textContent = `Saved review summary unavailable: ${error.message}`; });
+  }
   async function poll() {
-    if (!jobId) { get('scan-status').textContent = 'Start a label-flip scan from Prepare dataset.'; get('scan-progress').hidden = true; return; }
+    if (!jobId) { get('scan-status').textContent = 'Build a blended-injection dataset for unified results, or start a label-flip scan from Prepare dataset.'; get('scan-progress').hidden = true; return; }
     try {
       const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
       if (!response.ok) throw new Error('Scan unavailable. The server may have restarted; start a new scan from Prepare dataset.');

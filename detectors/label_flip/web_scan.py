@@ -108,6 +108,24 @@ def saved_feature_pairs(artifacts=ARTIFACTS):
 def availability(feature_file):
     try:
         paths = feature_pair(feature_file)
+        if paths[0].name.startswith('imdb-train-'):
+            labels = FeatureBundle.load(paths[0]).labels
+            requirement = 'at least 21 reviews and five reviews per sentiment label'
+        elif len(paths) == 1:
+            pixels = ImageInputBundle.load(
+                paths[0].with_name(paths[0].name.replace('-features.npz', '-images.npz'))
+            )
+            labels = pixels.labels
+            requirement = 'at least 21 images and five samples per digit'
+        else:
+            labels = FeatureBundle.load(paths[0]).labels
+            requirement = 'at least 21 samples and five samples in each of two classes'
+        _, counts = np.unique(labels, return_counts=True)
+        if len(labels) <= 20 or len(counts) < 2 or counts.min() < 5:
+            return dict(
+                ready=False,
+                message=f'Select a larger or more balanced extraction: scans need {requirement}.',
+            )
         # Leila: readiness describes the actual input used by the MNIST scanner.
         if paths[0].name.startswith('imdb-train-'):
             return dict(ready=True,dataset='imdb',message='MiniLM features ready for three provisional label-flip checks.',files=[paths[0].name])

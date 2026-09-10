@@ -4,6 +4,8 @@ import json
 import os
 import threading
 import uuid
+import base64
+from io import BytesIO
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -20,6 +22,8 @@ from poison_features import (
     extract_text,
 )
 from poison_features.attacks import poison_dataset, poison_texts
+from detectors.blended_injection.pipeline import scan_as_connector_result
+from detectors.output_connector import to_jsonable
 
 # Leila: keep label-flip scanning in its own adapter alongside the extraction API.
 from label_flip_api import handle_scan_request
@@ -52,8 +56,8 @@ class FeatureHandler(SimpleHTTPRequestHandler):
         if self.path == "/api/datasets":
             self._json({
                 "datasets": ["cifar10", "mnist", "imdb"],
-                "attacks": ["none", "label_flip", "backdoor", "blended_injection"],
-                "text_attacks": ["none", "label_flip"],
+                "attacks": ["none", "label_flip", "targeted_label_flip", "backdoor", "blended_injection"],
+                "text_attacks": ["none", "label_flip", "targeted_label_flip", "backdoor"],
             })
             return
         if self.path.startswith("/api/jobs/"):
@@ -84,6 +88,9 @@ class FeatureHandler(SimpleHTTPRequestHandler):
             return
         # Leila: handle scan requests first; existing extraction requests continue below.
         if handle_scan_request(self, JOBS, JOBS_LOCK, update_job):
+            return
+        if self.path == "/api/blended-injection/scan":
+            handle_blended_scan_request(self)
             return
         if self.path != "/api/extract":
             self.send_error(404)
@@ -118,6 +125,112 @@ def update_job(job_id: str, **changes) -> None:
         JOBS[job_id].update(changes)
 
 
+def handle_blended_scan_request(handler: FeatureHandler) -> None:
+    """Start Titus's detector against a saved post-attack image bundle."""
+    size = int(handler.headers.get("Content-Length", "0"))
+    request = json.loads(handler.rfile.read(size))
+    image_file = request.get("image_file")
+    if not isinstance(image_file, str):
+        handler._json({"error": "A saved image bundle is required."}, status=400)
+        return
+    artifacts = Path("artifacts").resolve()
+    image_path = (artifacts / Path(image_file).name).resolve()
+    if image_path.parent != artifacts or not image_path.is_file():
+        handler._json({"error": "The saved image bundle is missing."}, status=400)
+        return
+    job_id = uuid.uuid4().hex
+    with JOBS_LOCK:
+        JOBS[job_id] = {
+            "job_id": job_id, "status": "queued", "progress": 0,
+            "message": "Blended-injection scan queued",
+        }
+
+    def worker() -> None:
+        try:
+            update_job(job_id, status="running", progress=15, message="Loading saved images")
+            pixels = ImageInputBundle.load(image_path)
+            update_job(job_id, progress=35, message="Scanning shared residual signatures")
+            result = scan_as_connector_result(pixels)
+            payload = to_jsonable(result)
+            payload["top_samples"] = blended_top_samples(pixels, payload)
+            payload["image_file"] = str(image_path)
+            update_job(
+                job_id, status="complete", progress=100,
+                message="Blended-injection scan complete", result=payload,
+            )
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            update_job(job_id, status="error", progress=100, message=str(exc))
+
+    threading.Thread(target=worker, daemon=True).start()
+    handler._json({"job_id": job_id, "status": "queued"}, status=202)
+
+
+def blended_top_samples(bundle: ImageInputBundle, detector: dict, limit: int = 3) -> list[dict]:
+    """Return small previews of the highest-scoring flagged post-attack rows."""
+    from PIL import Image
+
+    scores = np.asarray(detector.get("scores", []), dtype=float)
+    flags = np.asarray(detector.get("flags", []), dtype=bool)
+    indices = np.flatnonzero(flags)
+    indices = sorted(indices.tolist(), key=lambda index: scores[index], reverse=True)[:limit]
+    previews = []
+    for index in indices:
+        pixels = np.moveaxis(
+            np.rint(bundle.images[index] * 255).clip(0, 255).astype("uint8"), 0, -1
+        )
+        if pixels.shape[-1] == 1:
+            pixels = pixels[..., 0]
+        buffer = BytesIO()
+        Image.fromarray(pixels).save(buffer, format="PNG")
+        previews.append({
+            "sample_id": str(bundle.sample_ids[index]),
+            "score": float(scores[index]),
+            "image": "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii"),
+        })
+    return previews
+
+
+def save_blended_review_record(job_id: str, bundle: ImageInputBundle, feature_file: str,
+                               detector: dict, ui_result: dict) -> None:
+    """Persist Titus findings using Leila's review/training scan contract."""
+    detector = to_jsonable(detector)
+    ui_result = to_jsonable(ui_result)
+    flags = np.asarray(detector.get("flags", []), dtype=bool)
+    sample_ids = bundle.sample_ids.tolist()
+    if flags.shape != (len(sample_ids),):
+        raise ValueError("Blended detector flags do not match saved image rows.")
+    states = np.where(flags, "uncertain", "not_flagged").tolist()
+    labels = bundle.labels.tolist()
+    record = {
+        "schema_version": "1.0",
+        "job_id": job_id,
+        "dataset": "cifar10",
+        "feature_files": [feature_file],
+        "assessment": {
+            "sample_ids": sample_ids,
+            "assessment": states,
+            "flags": flags.tolist(),
+            "summary": {
+                "not_flagged": int((~flags).sum()),
+                "uncertain": int(flags.sum()),
+                "suspected_label_flip": 0,
+            },
+            "vote_counts": {
+                "resnet18": [int(value) for value in flags],
+                "dinov2": [int(value) for value in flags],
+            },
+        },
+        "profile": {"name": "blended_injection", "limitation": "Detector findings require human review."},
+        "scans": {},
+        "ui_result": ui_result,
+    }
+    root = Path("artifacts") / "label_flip_scans" / job_id
+    root.mkdir(parents=True, exist_ok=True)
+    temporary = root / "results.tmp"
+    temporary.write_text(json.dumps(record, allow_nan=False), encoding="utf-8")
+    temporary.replace(root / "results.json")
+
+
 def bundle_result(bundle: FeatureBundle, feature_path: Path, image_path: Path | None) -> dict:
     return {
         # Leila: identify each encoder in the combined extraction response.
@@ -131,6 +244,7 @@ def bundle_result(bundle: FeatureBundle, feature_path: Path, image_path: Path | 
         "labels": bundle.labels.tolist(),
         "poisoned": None if bundle.is_poisoned is None else int(bundle.is_poisoned.sum()),
         "poison_type": None if bundle.poison_type is None else bundle.poison_type.tolist(),
+        "attack": (bundle.metadata or {}).get("attack", "none"),
         "feature_file": str(feature_path),
         "image_file": None if image_path is None else str(image_path),
     }
@@ -150,6 +264,8 @@ def run_extraction(job_id: str, request: dict) -> None:
         if encoder not in {"resnet18", "dinov2"}:
             raise ValueError("encoder must be 'resnet18' or 'dinov2'")
         poison_rate = float(request.get("poison_rate", 0.05))
+        source_label = request.get("source_label")
+        source_label = None if source_label is None else int(source_label)
         target_label = int(request.get("target_label", 0))
         blend_alpha = float(request.get("blend_alpha", 0.10))
         poison_count = request.get("poison_count")
@@ -167,11 +283,15 @@ def run_extraction(job_id: str, request: dict) -> None:
         artifacts.mkdir(exist_ok=True)
         size_key = "full" if full_training else str(limit)
         rate_key = f"{poison_rate:.2f}".replace(".", "")
-        attack_key = f"{attack}-a{blend_alpha:.2f}-t{target_label}-n{poison_count or 'rate'}"
+        attack_key = (
+            f"{attack}-s{source_label if source_label is not None else 'na'}"
+            f"-a{blend_alpha:.2f}-t{target_label}-n{poison_count or 'rate'}"
+        )
         update_job(job_id, status="running", progress=2, message="Loading dataset")
         if name == "imdb":
-            # Leila: expose only implemented text scenarios in this scan flow.
-            if attack not in ("none","label_flip","backdoor"): raise ValueError("Unsupported IMDB attack.")
+           # Leila: allow clean, label-flip, and backdoor scenarios for IMDB.
+            if attack not in ("none", "label_flip", "backdoor"):
+                raise ValueError("IMDB supports clean, label flip, or backdoor in this flow.")
             stem = f"{name}-{split}-{size_key}-minilm-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
             # Leila: version phrase builds separately; use the verified neutral prefix and positive target.
             if attack == "backdoor": stem += "-phrase-v1-positive-start"
@@ -196,11 +316,21 @@ def run_extraction(job_id: str, request: dict) -> None:
             labels = [data[int(i)]["label"] for i in indices]
             metadata = {}
             if attack != "none":
+                # Leila: pass the target once, preserving the IMDB backdoor target.
                 texts, labels, metadata = poison_texts(
                     texts, labels, attack=attack,
                     poison_rate=poison_rate,
+                    source_label=source_label,
+                    target_label=1 if attack == "backdoor" else target_label,
                     seed=int(request.get("seed", 0)),
-                    **(dict(target_label=1,trigger="silver lantern",trigger_position="start",selection_policy="non_target") if attack=="backdoor" else {}),
+                    **(
+                        dict(
+                            trigger="silver lantern",
+                            trigger_position="start",
+                            selection_policy="non_target",
+                        )
+                        if attack == "backdoor" else {}
+                    ),
                 )
             update_job(job_id, progress=15, message=f"Encoding {total:,} reviews with MiniLM")
             bundle = extract_text(
@@ -229,6 +359,7 @@ def run_extraction(job_id: str, request: dict) -> None:
                 dataset, attack,
                 poison_rate=poison_rate,
                 target_label=target_label,
+                source_label=source_label,
                 blend_alpha=blend_alpha,
                 poison_count=poison_count,
                 seed=int(request.get("seed", 0)),
@@ -277,7 +408,7 @@ def run_extraction(job_id: str, request: dict) -> None:
             attack_stem = clean_stem if attack == "none" else f"{name}-{split}-{size_key}-{encoder_key}-{attack_key}-{rate_key}-seed{int(request.get('seed', 0))}"
             feature_path = artifacts / f"{attack_stem}-features.npz"
             image_path = artifacts / f"{attack_stem}-images.npz"
-            if attack == "label_flip" and clean_feature_path.exists():
+            if attack in {"label_flip", "targeted_label_flip"} and clean_feature_path.exists():
                 base = FeatureBundle.load(clean_feature_path)
                 # Leila: cached features must describe these exact original rows.
                 if (not np.array_equal(base.sample_ids,sample_ids) or len(base.labels) != total
@@ -333,6 +464,29 @@ def run_extraction(job_id: str, request: dict) -> None:
         # Leila: copy the primary result so the JSON response has no circular reference.
         primary = dict(results[0])
         primary["representations"] = results
+        # Keep the blended detector in the same pipeline job as extraction so
+        # the results page can present one complete run.
+        if attack == "blended_injection" and name == "cifar10":
+            image_path = Path(results[0]["image_file"])
+            update_job(job_id, progress=98, message="Running blended-injection detector")
+            primary["detectors"] = {
+                "blended_injection": to_jsonable(
+                    scan_as_connector_result(ImageInputBundle.load(image_path))
+                )
+            }
+            primary["detectors"]["blended_injection"]["top_samples"] = blended_top_samples(
+                ImageInputBundle.load(image_path),
+                primary["detectors"]["blended_injection"],
+            )
+            primary["human_review_enabled"] = True
+            primary["review_job_id"] = job_id
+            save_blended_review_record(
+                job_id,
+                ImageInputBundle.load(image_path),
+                str(feature_path),
+                primary["detectors"]["blended_injection"],
+                primary,
+            )
         update_job(job_id, status="complete", progress=100, message="Extraction complete", result=primary)
     except Exception as exc:
         update_job(job_id, status="error", progress=100, message=str(exc))

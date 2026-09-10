@@ -7,7 +7,11 @@
   const saved = document.getElementById('saved-scan-features');
   let featureFile = null, generation = 0;
   const last = sessionStorage.getItem('label-flip-job');
-  if (last) { previous.href = `/scan?job=${encodeURIComponent(last)}`; previous.hidden = false; }
+  if (last) {
+    previous.href = `/scan?job=${encodeURIComponent(last)}`;
+    previous.textContent = 'View last label-flip scan';
+    previous.hidden = false;
+  }
   function reset() {
     generation++; featureFile = null; button.disabled = true;
     saved.value = '';
@@ -56,7 +60,7 @@
       }
       saved.value = selected || '';
       if (selected) await check(selected);
-      else { button.disabled = true; message.textContent = 'Choose saved data above or build the dataset first.'; }
+      else { button.disabled = true; message.textContent = 'Choose a saved extraction with at least 21 balanced samples.'; }
     } catch (error) { if (current === generation) message.textContent = error.message; }
   }
   saved.addEventListener('change', () => check(saved.value));
