@@ -61,6 +61,17 @@
       <h3>Top flagged candidates</h3>
       <div id="pipeline-examples" class="pipeline-examples"></div>
     </section>
+    <section id="backdoor-feature-results" hidden>
+      <h2>Backdoor findings · Feature detectors</h2>
+      <p id="backdoor-feature-summary" class="help"></p>
+      <div class="assessment-grid">
+        <article class="uncertain"><span>Needs review</span><strong id="backdoor-candidates">0</strong><p>Flagged by at least one feature detector.</p></article>
+        <article class="suspected"><span>Detector agreement</span><strong id="backdoor-agreement">0</strong><p>Flagged across both representations.</p></article>
+        <article class="clean"><span>Feature checks</span><strong id="backdoor-detectors">0</strong><p>Spectral Signature and Activation Clustering.</p></article>
+      </div>
+      <canvas id="backdoor-votes-chart" width="860" height="180" aria-label="Animated backdoor detector vote chart"></canvas>
+      <p class="help">These are additional review signals. The repeated patch detector below remains as a fail-safe.</p>
+    </section>
     <!-- Leila: these cards describe label-flip results only. -->
     <h2>Label-flip findings</h2>
     <div class="assessment-grid">

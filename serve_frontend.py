@@ -24,6 +24,7 @@ from poison_features import (
 from poison_features.attacks import poison_dataset, poison_texts
 from detectors.blended_injection.pipeline import scan_as_connector_result
 from detectors.output_connector import to_jsonable
+from detectors.feature_pipeline import scan_feature_bundle
 
 # Leila: keep label-flip scanning in its own adapter alongside the extraction API.
 from label_flip_api import handle_scan_request
@@ -102,6 +103,9 @@ class FeatureHandler(SimpleHTTPRequestHandler):
         if self.path == "/api/blended-injection/scan":
             handle_blended_scan_request(self)
             return
+        if self.path == "/api/backdoor-features/scan":
+            handle_backdoor_feature_scan_request(self)
+            return
         if self.path != "/api/extract":
             self.send_error(404)
             return
@@ -133,6 +137,44 @@ class FeatureHandler(SimpleHTTPRequestHandler):
 def update_job(job_id: str, **changes) -> None:
     with JOBS_LOCK:
         JOBS[job_id].update(changes)
+
+
+def handle_backdoor_feature_scan_request(handler: FeatureHandler) -> None:
+    """Run the teammate's spectral/clustering track on a saved FeatureBundle."""
+    size = int(handler.headers.get("Content-Length", "0"))
+    request = json.loads(handler.rfile.read(size))
+    feature_file = request.get("feature_file")
+    artifacts = Path("artifacts").resolve()
+    feature_path = (artifacts / Path(feature_file).name).resolve() if isinstance(feature_file, str) else None
+    if feature_path is None or feature_path.parent != artifacts or not feature_path.is_file():
+        handler._json({"error": "A saved feature bundle is required."}, status=400)
+        return
+    job_id = uuid.uuid4().hex
+    with JOBS_LOCK:
+        JOBS[job_id] = {"job_id": job_id, "status": "queued", "progress": 0,
+                        "message": "Backdoor feature scan queued"}
+
+    def worker() -> None:
+        try:
+            update_job(job_id, status="running", progress=10, message="Loading saved features")
+            bundle = FeatureBundle.load(feature_path)
+            update_job(job_id, progress=30, message="Running spectral and clustering detectors")
+            scan = to_jsonable(scan_feature_bundle(bundle, tracks=("backdoor",)))
+            result = {
+                "dataset": bundle.dataset_name,
+                "attack": "backdoor",
+                "samples": len(bundle.sample_ids),
+                "sample_ids": bundle.sample_ids.tolist(),
+                "feature_file": str(feature_path),
+                "detectors": {"backdoor_feature": scan["tracks"]["backdoor"]},
+            }
+            update_job(job_id, status="complete", progress=100,
+                       message="Backdoor feature scan complete", result=result)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            update_job(job_id, status="error", progress=100, message=str(exc))
+
+    threading.Thread(target=worker, daemon=True).start()
+    handler._json({"job_id": job_id, "status": "queued"}, status=202)
 
 
 def handle_blended_scan_request(handler: FeatureHandler) -> None:
