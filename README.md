@@ -1,5 +1,13 @@
 # Gisec Project - PoisonGuard Feature Layer
 
+For the revised colour-independent patch scan, saved-file HTML reports and
+the fixed-profile validation results, see
+[Backdoor patch update](docs/detectors/backdoor/PATCH_FIX.md).
+Run saved image/feature pairs with
+`python -m experiments.scan_backdoor_images --folder artifacts --evaluate --open`.
+The command now defaults to the contrast profile; the original bright-patch
+results remain visible for comparison. The feature-only methods remain experimental.
+
 For label-flip detectors, the shared output connector, and saved-feature run
 commands, see the [detector code guide](docs/detectors/README.md).
 Feature matrices exported by another program can use the dataset-neutral

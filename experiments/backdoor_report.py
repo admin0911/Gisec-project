@@ -53,14 +53,19 @@ def report_html(result, pixels):
     rows.append(("candidates", len(candidates)))
     for name, flagged in rows:
         metric = evaluation.get(name)
+        label = name + (" (comparison only)" if name in result["settings"].get("comparison_only", []) else "")
         details = ([f"{metric['tp']}/{metric['tp'] + metric['fn']}", str(metric['fp']),
                     rate(metric["recall"]), rate(metric["precision"]), rate(metric["false_positive_rate"])]
                    if metric else ["N/A"] * 5)
-        body += "<tr>" + "".join(f"<td>{escape(str(value))}</td>" for value in [name, flagged, *details]) + "</tr>"
+        body += "<tr>" + "".join(f"<td>{escape(str(value))}</td>" for value in [label, flagged, *details]) + "</tr>"
     body += ("</table></div><p class='muted'>" + escape(result["evaluation_note"]) +
              " Precision is undefined when nothing is flagged; recall is undefined when there are no known poisoned samples. "
              "Detection recall is not model attack success rate (ASR).</p>")
-    patterns = result["detectors"]["repeated_patch"]["evidence"]["patterns"]
+    active = result["settings"].get("active_detectors", list(result["detectors"]))
+    body += "<p>Review candidates use: " + escape(", ".join(active)) + ". Comparison-only flags are retained in JSON/CSV but do not add candidates.</p>"
+    pixel_name = "contrast_patch" if "contrast_patch" in active else "repeated_patch"
+    pixel_result = result["detectors"][pixel_name]
+    patterns = pixel_result["evidence"]["patterns"]
     body += "<h2>Pixel evidence</h2><p>Coordinates start at zero. Patterns are inferred from the submitted pixels and current labels.</p>"
     if patterns:
         body += "<div class='scroll'><table class='pattern'><tr><th>Position (row, column)</th><th>Size</th><th>Matches</th><th>Dominant label</th><th>Label purity</th></tr>"
@@ -70,18 +75,24 @@ def report_html(result, pixels):
             body += "<tr>" + "".join(f"<td>{escape(str(v))}</td>" for v in values) + "</tr>"
         body += f"</table></div><p>Showing {min(100, len(patterns))} of {len(patterns)} accepted patterns. All are in JSON.</p>"
     else:
-        body += "<p>No repeated bright patch passed the fixed profile.</p>"
+        body += "<p>No repeated patch passed the selected profile.</p>"
+    diagnostic_counts = pixel_result["evidence"].get("diagnostic_counts", {})
+    if diagnostic_counts:
+        body += "<h2>Candidate diagnostics</h2><p>Counts describe candidate patterns, not individual images. Full details are in JSON.</p><table><tr><th>Decision</th><th>Pattern groups</th></tr>"
+        for name, count in diagnostic_counts.items():
+            body += f"<tr><td>{escape(name)}</td><td>{count}</td></tr>"
+        body += "</table>"
     body += f"<h2>Flagged images</h2><p>Showing the first {min(24, len(candidates))} of {len(candidates)} candidates in input order. All sample IDs are in CSV.</p><div class='grid'>"
     for index in candidates[:24]:
         values = np.rint(pixels.images[index] * 255).astype(np.uint8)
         values = values[0] if values.shape[0] == 1 else values.transpose(1, 2, 0)
         buffer = BytesIO(); Image.fromarray(values).save(buffer, format="PNG")
         encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
-        methods = ", ".join(name for name, item in result["detectors"].items() if item["flags"][index])
+        methods = ", ".join(name for name, item in result["detectors"].items() if name in active and item["flags"][index])
         body += (f"<figure><img alt='Submitted image' src='data:image/png;base64,{encoded}'>"
                  f"<figcaption><b>{escape(str(pixels.sample_ids[index]))}</b><br>Current label: "
                  f"{escape(str(pixels.labels[index]))}<br>Flagged by: {escape(methods)}</figcaption></figure>")
-    body += "</div><footer>Existing pixel thresholds retained. Feature detectors remain experimental. No classifier training or automatic cleaning was performed.</footer>"
+    body += "</div><footer>Selected profile: " + escape(pixel_result["settings"].get("profile", pixel_name)) + ". Feature detectors remain experimental. No classifier training or automatic cleaning was performed.</footer>"
     return page(title, body)
 
 
@@ -102,7 +113,7 @@ def write_sample_csv(path, result):
 
 
 def index_html(entries):
-    body = "<h1>Backdoor scan reports</h1><p>Pixels and embeddings evaluated separately. Any flag creates a review candidate.</p><div class='cards'>"
+    body = "<h1>Backdoor scan reports</h1><p>Pixels and embeddings evaluated separately. Active detector flags create review candidates; comparison-only results remain separate.</p><div class='cards'>"
     for entry in entries:
         body += (f"<div class='card'><a href='{escape(entry['link'], quote=True)}'>{escape(entry['name'])}</a>"
                  f"<p>{entry['rows']:,} images · <strong>{entry['flagged']}</strong> candidates</p></div>")

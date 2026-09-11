@@ -25,7 +25,7 @@ def paired_images(features):
     return path
 
 
-def run_scan(image_file, *, feature_file=None, dataset=None, evaluate=False, known_clean=False):
+def run_scan(image_file, *, feature_file=None, dataset=None, evaluate=False, known_clean=False, patch_profile="contrast"):
     pixels = ImageInputBundle.load(image_file)
     bundle = FeatureBundle.load(feature_file) if feature_file else None
     if bundle is not None and bundle.modality != "image":
@@ -35,7 +35,7 @@ def run_scan(image_file, *, feature_file=None, dataset=None, evaluate=False, kno
     dataset = dataset or (bundle.dataset_name if bundle else None)
     inputs = detector_input(bundle, representation="raw", label_aware=True) if bundle else None
     start = perf_counter()
-    result = scan_backdoor_images(pixels, dataset=dataset, features=inputs, progress=print)
+    result = scan_backdoor_images(pixels, dataset=dataset, features=inputs, progress=print, patch_profile=patch_profile)
     result["runtime_seconds"] = perf_counter() - start
     result["input"] = dict(feature_file=str(feature_file) if feature_file else None,
                            image_file=str(image_file), dataset=dataset,
@@ -70,6 +70,8 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("artifacts/backdoor-reports"))
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--known-clean", action="store_true", help="Explicitly assert a single dataset is clean for evaluation")
+    parser.add_argument("--patch-profile", choices=("contrast", "legacy"), default="contrast",
+                        help="Use the revised contrast detector, or reproduce the original pixel decisions")
     parser.add_argument("--open", action="store_true", help="Open the generated index in the default browser")
     args = parser.parse_args()
     if args.folder and (args.images or args.known_clean):
@@ -97,7 +99,7 @@ def main():
     for index, (features, images) in enumerate(jobs):
         try:
             result, pixels = run_scan(images, feature_file=features, dataset=args.dataset,
-                                      evaluate=args.evaluate, known_clean=args.known_clean)
+                                      evaluate=args.evaluate, known_clean=args.known_clean, patch_profile=args.patch_profile)
         except (ValueError, TypeError, FileNotFoundError) as exc:
             parser.error(f"{features or images}: {exc}")
         folder = output / f"scan-{index + 1:03d}"

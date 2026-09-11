@@ -1,5 +1,11 @@
 # Run the combined image backdoor scan
 
+**Update:** the saved-file command now defaults to `--patch-profile contrast`.
+It reports the original bright-patch detector as comparison-only. See
+[PATCH_FIX.md](PATCH_FIX.md) for revised results and limitations. The legacy
+results below describe the previous version and remain reproducible with
+`--patch-profile legacy`.
+
 The earlier `scan_backdoor_features` command scans embeddings only. On the
 submitted 1,000-row CIFAR-10 patch experiment it missed all 54 poisoned rows
 with both ResNet-18 and DINOv2. That failed result remains valid.
