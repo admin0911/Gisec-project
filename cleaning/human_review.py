@@ -171,7 +171,6 @@ def review_page(job_id, group='uncertain', page=0, page_size=20):
             # Leila: show why a sample entered the combined review queue.
             blended_flagged=bool(data.get('blended_scan',{}).get('flags',[False]*len(a['sample_ids']))[i]),
             patch_flagged=bool(data.get('patch_scan',{}).get('flags',[False]*len(a['sample_ids']))[i]),
-            feature_backdoor_flagged=bool(data.get('backdoor_feature',{}).get('candidate_flags',[False]*len(a['sample_ids']))[i]),
             assessment=a['assessment'][i]))
     decisions = [saved['decisions'].get(str(a['sample_ids'][i]), {}).get('decision') for i in rows]
     return dict(items=items, page=page, page_size=page_size, pages=pages, total=len(rows),

@@ -211,16 +211,6 @@ def run_scan(feature_file, output_dir, progress):
     probe.write_text('write check',encoding='utf-8')
     probe.unlink()
     scans, assessment, rows = scan_inputs(inputs, progress)
-    # Run the teammate feature backdoor track on both frozen representations.
-    # These findings are additional review evidence; Leila's pixel patch scan
-    # remains the fallback detector below.
-    from detectors.feature_pipeline import scan_feature_bundle
-    feature_backdoor = {}
-    for index, (encoder, path) in enumerate((("resnet18", resnet_path), ("dinov2_vits14", dino_path)), 1):
-        progress(5.2 + index * .2, f'Stage 2 of 3 · Backdoor checks\nFeature track {index} of 2 · {encoder}')
-        bundle = FeatureBundle.load(path)
-        track = scan_feature_bundle(bundle, tracks=("backdoor",), representation="raw")["tracks"]["backdoor"]
-        feature_backdoor[encoder] = track
     # Leila: use verified original image rows for the additional patch stage.
     from detectors.backdoor.web_patch import scan_patch
     pixels = ImageInputBundle.load(resnet_path.with_name(resnet_path.name.replace('-features.npz','-images.npz')))
@@ -231,34 +221,14 @@ def run_scan(feature_file, output_dir, progress):
     blended_result, blended_ui = scan_noise(pixels, progress)
     if scan_identity((resnet_path,dino_path),profile) != identity:
         raise ValueError('Inputs or detector settings changed during scanning. Run a new scan.')
-    feature_flags = np.asarray([
-        np.asarray(result["candidate_flags"], dtype=bool)
-        for result in feature_backdoor.values()
-    ])
-    feature_votes = feature_flags.sum(axis=0).astype(np.int64)
-    backdoor_feature = dict(
-        sample_ids=inputs["resnet18"].sample_ids,
-        detectors={f"{encoder}_{name}": result
-                   for encoder, track in feature_backdoor.items()
-                   for name, result in track["detectors"].items()},
-        flag_count=feature_votes,
-        candidate_flags=feature_votes >= 1,
-        agreement_flags=feature_votes >= 2,
-        settings=dict(status="review_only_uncalibrated",
-                       limitation="Feature anomalies are not proof of a backdoor."),
-    )
-    backdoor_feature["sample_ids"] = np.asarray(feature_backdoor["resnet18"]["sample_ids"])
-    full = dict(dataset="cifar10", blended_scan=blended_result, profile=profile,
-                feature_files=[str(resnet_path), str(dino_path)], scans=scans,
-                assessment=assessment, patch_scan=patch_result,
-                backdoor_feature=backdoor_feature)
+    full = dict(dataset="cifar10", blended_scan=blended_result, profile=profile, feature_files=[str(resnet_path), str(dino_path)],
+                scans=scans, assessment=assessment, patch_scan=patch_result)
     selected = np.flatnonzero(assessment['flags'])[:24]
     examples = [dict(sample_id=str(assessment['sample_ids'][i]), label=to_jsonable(labels[i]),
         assessment=str(assessment['assessment'][i]),
         resnet_votes=int(assessment['vote_counts']['resnet18'][i]),
         dino_votes=int(assessment['vote_counts']['dinov2'][i])) for i in selected]
-    ui = dict(dataset="cifar10", blended_scan=blended_ui, patch_scan=patch_ui,
-        backdoor_feature=backdoor_feature, samples=len(labels), summary=assessment['summary'], detectors=rows,
+    ui = dict(dataset="cifar10", blended_scan=blended_ui, patch_scan=patch_ui, samples=len(labels), summary=assessment['summary'], detectors=rows,
         examples=examples, profile=profile['name'], limitation=profile['limitation'],
         result_file=str(output_dir / 'results.json'), human_review_enabled=False)
 

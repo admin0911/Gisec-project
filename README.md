@@ -1,18 +1,9 @@
 # PoisonGuard
 
-<<<<<<< HEAD
-For label-flip detectors, the shared output connector, and saved-feature run
-commands, see the [detector code guide](docs/detectors/README.md).
-Feature matrices exported by another program can use the dataset-neutral
-[feature input adapter](docs/detectors/FEATURE_BUNDLE_INPUT.md); this keeps
-backdoor and label-inconsistency tracks separate and does not automatically
-remove flagged rows.
-=======
 PoisonGuard scans training datasets for suspicious labels, repeated backdoor
 triggers and blended noise, then compares training before and after filtering.
 Human review is optional. A flag does not prove poisoning, and no flags do not
 guarantee a clean dataset.
->>>>>>> origin/detector/leila-detectors
 
 ## Setup and launch (Windows, Python 3.12)
 

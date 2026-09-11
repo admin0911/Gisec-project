@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import numpy as np
 from threadpoolctl import threadpool_limits
-from poison_features import FeatureBundle, ImageInputBundle
+from poison_features import ImageInputBundle
 from experiments.scan_mnist_pixels import pixel_input, scan_pixels
 from detectors.output_connector import to_jsonable
 from .scan_cache import scan_identity, save_cache_record
@@ -48,23 +48,6 @@ def run(feature_path, output_dir, progress):
     with threadpool_limits(limits=4):
         # Leila: apply the same threshold recorded in the scan/cache profile.
         results, timings = scan_pixels(inputs, knn_threshold=config['knn_threshold'], progress=report)
-    from detectors.feature_pipeline import scan_feature_bundle
-    try:
-        feature_bundle = FeatureBundle.load(feature_path)
-    except KeyError:
-        # Preserve compatibility with older MNIST feature artifacts that
-        # contain only the detector-facing arrays.
-        from poison_features.external import feature_bundle_from_arrays
-        with np.load(feature_path, allow_pickle=False) as saved:
-            feature_bundle = feature_bundle_from_arrays(
-                saved["features"], labels=saved["labels"],
-                sample_ids=saved["sample_ids"], modality="image",
-                encoder="external", dataset_name="mnist",
-            )
-    feature_backdoor = scan_feature_bundle(
-        feature_bundle, tracks=("backdoor",), representation="raw",
-        progress=lambda message: progress(6.2, f"Stage 2 of 3 · Backdoor checks\n{message}"),
-    )["tracks"]["backdoor"]
     votes = np.sum(np.stack([r['flags'] for r in results.values()]), axis=0)
     states = np.full(len(votes), 'not_flagged', dtype='<U24')
     states[votes == 1] = 'uncertain'
@@ -88,16 +71,13 @@ def run(feature_path, output_dir, progress):
     selected = np.flatnonzero(votes > 0)[:24]
     examples = [dict(sample_id=str(inputs.sample_ids[i]),label=int(inputs.y[i]),
         assessment=str(states[i]),pixel_votes=int(votes[i])) for i in selected]
-    ui = dict(blended_scan=blended_ui, patch_scan=patch_ui, backdoor_feature=feature_backdoor,
-        dataset='mnist', samples=len(votes), summary=assessment['summary'], detectors=rows,
+    ui = dict(blended_scan=blended_ui, patch_scan=patch_ui, dataset='mnist', samples=len(votes), summary=assessment['summary'], detectors=rows,
         examples=examples, profile=config['name'],limitation=config['limitation'],
         result_file=str(output/'results.json'),human_review_enabled=True,training_enabled=True)
     if scan_identity((feature_path,), config) != identity:
         raise ValueError('Inputs or settings changed during scanning. Rebuild and retry.')
     full = dict(dataset='mnist',profile=config,feature_files=[str(feature_path)],
-        blended_scan=blended_result, patch_scan=patch_result, backdoor_feature=feature_backdoor,
-        scans={'pixels':{'detectors':results}}, assessment=assessment, ui_result=ui,
-        detector_seconds=timings)
+        blended_scan=blended_result, patch_scan=patch_result, scans={'pixels':{'detectors':results}},assessment=assessment,ui_result=ui,detector_seconds=timings)
     (output/'results.json').write_text(json.dumps(to_jsonable(full),allow_nan=False),encoding='utf-8')
     save_cache_record(output,identity)
     return to_jsonable(ui)

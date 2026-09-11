@@ -81,14 +81,6 @@
           <div id="blended-examples" class="blended-examples"></div>
         </div>
       </section>
-      <section id="backdoor-controls" class="scan-controls" aria-label="Feature backdoor detection" hidden>
-        <h2><span class="step">3</span> Scan backdoor features</h2>
-        <label>Saved feature bundle
-          <select id="backdoor-scan-features"><option value="">Build a dataset first</option></select>
-        </label>
-        <button id="scan-backdoor" disabled>Run backdoor detectors →</button>
-        <p id="backdoor-status" class="help" aria-live="polite">Spectral Signature and Activation Clustering will inspect the selected feature representation.</p>
-      </section>
       <section id="result" class="result" hidden>
         <strong id="summary"></strong>
         <!-- Leila: preserve optional build diagnostics in a collapsed disclosure. -->
@@ -106,8 +98,6 @@
     <script src="/app.js?v=mixed-v1"></script>
     <!-- Leila: separate scan controller listens for completed feature extractions. -->
     <script src="/label-flip.js?v=dataset-descriptions-v1"></script>
-    <script src="/backdoor-detector.js?v=feature-track-v1"></script>
-    <script src="/blended-detector.js?v=blended-track-v2"></script>
     <!-- Leila: noise runs after patches through Scan dataset, without a duplicate automatic scan. -->
   </body>
 </html>

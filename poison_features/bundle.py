@@ -1,21 +1,10 @@
 """Detector-facing feature result types."""
 
 from dataclasses import dataclass
-import json
 from pathlib import Path
 from typing import Any, Optional
 
 import numpy as np
-
-
-def _metadata_json(value):
-    if isinstance(value, np.ndarray):
-        return value.tolist()
-    if isinstance(value, np.generic):
-        return value.item()
-    if isinstance(value, Path):
-        return str(value)
-    raise TypeError(f"Metadata value {type(value).__name__} is not JSON serializable")
 
 
 @dataclass
@@ -86,8 +75,6 @@ class FeatureBundle:
             if self.is_poisoned is not None else np.empty((0,), dtype=bool),
             poison_type=self.poison_type
             if self.poison_type is not None else np.empty((0,), dtype="<U1"),
-            format_version=np.array("1.1"),
-            metadata_json=np.array(json.dumps(metadata, sort_keys=True, default=_metadata_json)),
             metadata=np.array(metadata, dtype=object),
         )
 

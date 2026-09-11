@@ -41,9 +41,10 @@ function updateWorkflowVisibility() {
   const cifar = $('dataset').value === 'cifar10';
   const labelFlip = ['label_flip', 'targeted_label_flip'].includes(attack);
   const blended = attack === 'blended_injection' && cifar;
-  $('label-flip-controls').hidden = !labelFlip;
-  if ($('backdoor-controls')) $('backdoor-controls').hidden = attack !== 'backdoor';
-  $('blended-controls').hidden = !blended;
+  // Leila: saved datasets and the complete scan are available for every attack.
+  $('label-flip-controls').hidden = false;
+  // Leila: use the complete Scan dataset flow for every attack.
+  $('blended-controls').hidden = true;
   if (!blended) $('blended-result').hidden = true;
   if (!labelFlip) {
     $('last-scan').hidden = true;

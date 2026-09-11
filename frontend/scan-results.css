@@ -99,7 +99,6 @@ details[open] summary { margin-bottom: 16px; }
 .pipeline-example { margin: 0; padding: 10px; border: 1px solid #dfe5ed; border-radius: 10px; background: #f8fafc; }
 .pipeline-example img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; image-rendering: pixelated; background: #10131a; border-radius: 6px; }
 .pipeline-example figcaption { margin-top: 8px; color: #53637b; font-size: .8rem; overflow-wrap: anywhere; }
-#backdoor-votes-chart { display: block; width: 100%; max-width: 860px; margin: 18px 0 10px; border-radius: 10px; }
 .review-counts { display: flex; flex-wrap: wrap; gap: 10px; }
 .review-counts span { padding: 10px 14px; border-radius: 8px; font-size: .85rem; }
 .review-counts b { margin-left: 10px; font-variant-numeric: tabular-nums; }

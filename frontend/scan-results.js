@@ -35,10 +35,6 @@
       renderPipeline(data);
       return;
     }
-    if (data && data.detectors && !Array.isArray(data.detectors) && data.detectors.backdoor_feature) {
-      renderStandaloneBackdoorFeature(data);
-      return;
-    }
     // Leila: describe the single pixel representation separately from the CIFAR dual encoders.
     const mnist = data.dataset === 'mnist';
     const imdb = data.dataset === 'imdb';
@@ -66,7 +62,6 @@
     get('review-uncertain').href = `${reviewUrl}&group=uncertain`;
     get('review-suspected').href = `${reviewUrl}&group=suspected_label_flip`;
     get('scan-summary').textContent = `${number(data.samples)} ${imdb ? 'IMDB' : mnist ? 'MNIST' : 'CIFAR-10'} samples scanned · Experimental assessment`;
-    renderBackdoorFeature(data.backdoor_feature);
     get('not-flagged').textContent = number(data.summary.not_flagged);
     get('uncertain').textContent = number(data.summary.uncertain);
     get('suspected').textContent = number(data.summary.suspected_label_flip);
@@ -212,61 +207,6 @@
     get('review-saved-status').hidden = false;
     loadReviewSummaryFor(reviewJob);
     get('scan-result').hidden = false;
-  }
-  function renderBackdoorFeature(track) {
-    if (!track) { get('backdoor-feature-results').hidden = true; return; }
-    const candidates = track.candidate_flags || [];
-    const agreement = track.agreement_flags || [];
-    const detectorNames = Object.keys(track.detectors || {});
-    get('backdoor-feature-summary').textContent =
-      `${detectorNames.length} feature checks ran across ResNet-18 and DINOv2 representations.`;
-    get('backdoor-candidates').textContent = number(candidates.filter(Boolean).length);
-    get('backdoor-agreement').textContent = number(agreement.filter(Boolean).length);
-    get('backdoor-detectors').textContent = number(detectorNames.length);
-    drawVoteChart(track.flag_count || []);
-    get('backdoor-feature-results').hidden = false;
-  }
-  function renderStandaloneBackdoorFeature(data) {
-    const track = data.detectors.backdoor_feature;
-    const candidates = track.candidate_flags || [];
-    const agreement = track.agreement_flags || [];
-    const detectorNames = Object.keys(track.detectors || {});
-    get('scan-description').textContent = `${number(data.samples)} ${data.dataset || 'dataset'} samples processed through feature backdoor detectors.`;
-    get('scan-summary').textContent = 'Feature backdoor scan complete';
-    get('backdoor-feature-summary').textContent = 'Feature detectors are shown alongside the existing backdoor safeguards.';
-    get('backdoor-candidates').textContent = number(candidates.filter(Boolean).length);
-    get('backdoor-agreement').textContent = number(agreement.filter(Boolean).length);
-    get('backdoor-detectors').textContent = number(detectorNames.length);
-    drawVoteChart(track.flag_count || []);
-    get('backdoor-feature-results').hidden = false;
-    get('scan-result').querySelector('.visual-summary').hidden = true;
-    get('review-uncertain').closest('.assessment-grid').hidden = true;
-    get('patch-results').hidden = true;
-    get('human-review').hidden = true;
-    get('prepare-training').hidden = true;
-    get('scan-result').hidden = false;
-  }
-  function drawVoteChart(votes) {
-    const canvas = get('backdoor-votes-chart');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const counts = [votes.filter(value => value === 0).length, votes.filter(value => value === 1).length, votes.filter(value => value >= 2).length];
-    const max = Math.max(1, ...counts);
-    const started = performance.now();
-    function frame(now) {
-      const phase = Math.min(1, (now - started) / 700);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ['0 votes', '1 vote', '2 votes'].forEach((label, index) => {
-        const height = counts[index] / max * (canvas.height - 50) * phase;
-        const x = 90 + index * 250;
-        ctx.fillStyle = index === 2 ? '#d45c67' : index === 1 ? '#d99421' : '#2b956d';
-        ctx.fillRect(x, canvas.height - 30 - height, 120, height);
-        ctx.fillStyle = '#53637b'; ctx.font = '14px Segoe UI'; ctx.fillText(label, x + 25, canvas.height - 10);
-      });
-      if (phase < 1) requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
   }
   function drawPipelineChart(entries) {
     const canvas = get('pipeline-contrast-chart');
