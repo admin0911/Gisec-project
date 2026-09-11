@@ -7,10 +7,20 @@
 - `label_flip/confident_learning.py`: out-of-fold label-quality checks.
 - `label_flip/pipeline.py`: runs all three and combines review votes.
 - `output_connector.py`: shared result dictionary and JSON conversion.
-- `backdoor/`: reserved for teammates' backdoor detectors; currently empty apart from its package marker.
+- `backdoor/repeated_patch.py`: repeated bright pixel-patch heuristic, integrated into image web scans.
+- `backdoor/spectral_signature.py`: experimental within-class spectral feature outliers.
+- `backdoor/activation_clustering.py`: experimental minority feature-cluster analysis.
+- `backdoor/feature_pipeline.py`: both feature methods with separate results and review candidates.
+- `blended_injection/`: shared residual-signature detection and its pipeline.
+
+See [FEATURE_DETECTORS.md](backdoor/FEATURE_DETECTORS.md) for the experimental
+backdoor feature methods, command-line runs, thresholds, and limitations.
 
 Start with [CONNECTOR.md](CONNECTOR.md) for integration, or
 [CONFIDENT_LEARNING.md](label_flip/CONFIDENT_LEARNING.md) for label-flip experiment setup.
+For a dataset-neutral NPZ or in-memory feature matrix, use
+[FEATURE_BUNDLE_INPUT.md](FEATURE_BUNDLE_INPUT.md) and
+`python -m experiments.scan_feature_bundle`.
 
 For the optional DINOv2 extractor and paired ResNet18 comparison, see
 [FEATURE_COMPARISON.md](label_flip/FEATURE_COMPARISON.md).

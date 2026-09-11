@@ -2,6 +2,10 @@
 
 For label-flip detectors, the shared output connector, and saved-feature run
 commands, see the [detector code guide](docs/detectors/README.md).
+Feature matrices exported by another program can use the dataset-neutral
+[feature input adapter](docs/detectors/FEATURE_BUNDLE_INPUT.md); this keeps
+backdoor and label-inconsistency tracks separate and does not automatically
+remove flagged rows.
 
 This is a standalone module created for merging into the wider PoisonGuard
 competition project. It intentionally does not import the existing
