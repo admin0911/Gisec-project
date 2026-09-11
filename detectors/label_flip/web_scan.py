@@ -247,6 +247,7 @@ def run_scan(feature_file, output_dir, progress):
         settings=dict(status="review_only_uncalibrated",
                        limitation="Feature anomalies are not proof of a backdoor."),
     )
+    backdoor_feature["sample_ids"] = np.asarray(feature_backdoor["resnet18"]["sample_ids"])
     full = dict(dataset="cifar10", blended_scan=blended_result, profile=profile,
                 feature_files=[str(resnet_path), str(dino_path)], scans=scans,
                 assessment=assessment, patch_scan=patch_result,
