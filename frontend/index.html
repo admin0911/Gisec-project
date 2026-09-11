@@ -35,10 +35,11 @@
         </label>
         </div></div>
         <div class="control-group"><h2><span class="step">2</span> Choose demo attack</h2><div class="field-row">
-        <label>Attack <select id="attack"><option value="none">Clean</option><option value="label_flip">Random label flip</option><option value="targeted_label_flip">Targeted label flip</option><option value="backdoor">Backdoor patch</option><option value="blended_injection">Blended noise injection</option></select></label>
+        <label>Attack <select id="attack"><option value="none">Clean</option><option value="label_flip">Random label flip</option><option value="targeted_label_flip">Targeted label flip</option><option value="backdoor">Backdoor patch</option><option value="blended_injection">Blended noise injection</option><option value="mixed_noise">Mixed: label flip + noise</option><option value="mixed_all">Mixed: label flip + patch + noise</option></select></label>
         <label id="source-control" hidden>Source label <input id="source-label" type="number" value="1" min="0" max="9"></label>
         <label id="target-control" hidden>Target label <input id="target-label" type="number" value="0" min="0" max="9"></label>
         <label id="alpha-control" hidden>Blend alpha <input id="blend-alpha" type="number" value="0.10" min="0.01" max="1" step="0.01"></label>
+        <p id="mixed-note" class="help" hidden>Total poisoning is shared equally across non-overlapping attack groups (maximum 10%). Rounding may differ by one sample.</p>
         <!-- Leila: 7% is available for label-flip and backdoor dataset builds. -->
         <label>Poison rate <select id="poison-rate"><option value="0.01">1%</option><option value="0.03">3%</option><option value="0.05" selected>5%</option><option id="rate-seven" value="0.07" hidden disabled>7%</option><option value="0.10">10%</option></select></label>
         </div></div>
@@ -102,7 +103,7 @@
     </main>
     <!-- Leila: refresh build controls so settings stay locked during extraction. -->
     <!-- Leila: temporarily bypass MNIST encoding at build time. -->
-    <script src="/app.js?v=all-attack-scan-v2"></script>
+    <script src="/app.js?v=mixed-v1"></script>
     <!-- Leila: separate scan controller listens for completed feature extractions. -->
     <script src="/label-flip.js?v=dataset-descriptions-v1"></script>
     <script src="/backdoor-detector.js?v=feature-track-v1"></script>

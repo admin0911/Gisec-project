@@ -31,8 +31,6 @@ from detectors.blended_injection.pipeline import (
     scan_settings,
 )
 
-# Leila: retain the MNIST consensus-pixel detector alongside the CIFAR detector.
-from .consensus_pixels import ConsensusPixelDetector, scan_consensus_pixels
 
 __all__ = [
     "BlendedInjectionDetector",
@@ -43,6 +41,4 @@ __all__ = [
     "scan_all_classes",
     "scan_blended_injection",
     "scan_settings",
-    "ConsensusPixelDetector",
-    "scan_consensus_pixels",
 ]

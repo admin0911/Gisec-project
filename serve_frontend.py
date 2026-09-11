@@ -57,7 +57,7 @@ class FeatureHandler(SimpleHTTPRequestHandler):
         if self.path == "/api/datasets":
             self._json({
                 "datasets": ["cifar10", "mnist", "imdb"],
-                "attacks": ["none", "label_flip", "targeted_label_flip", "backdoor", "blended_injection"],
+                "attacks": ["none", "label_flip", "targeted_label_flip", "backdoor", "blended_injection", "mixed_noise", "mixed_all"],
                 "text_attacks": ["none", "label_flip", "targeted_label_flip", "backdoor"],
             })
             return
@@ -326,7 +326,7 @@ def run_extraction(job_id: str, request: dict) -> None:
             poison_rate = 0.0
         # Leila: allow 7% for label-flip and patch-backdoor experiments.
         allowed_rates = {0.01, 0.03, 0.05, 0.10}
-        if attack in {"label_flip", "backdoor"}: allowed_rates.add(0.07)
+        if attack in {"label_flip", "backdoor", "mixed_noise", "mixed_all"}: allowed_rates.add(0.07)
         if attack != "none" and poison_rate not in allowed_rates:
             choices = ', '.join(f'{rate:.0%}' for rate in sorted(allowed_rates))
             raise ValueError(f"poison_rate must be one of: {choices}")
@@ -408,7 +408,7 @@ def run_extraction(job_id: str, request: dict) -> None:
         attacked_dataset = clean_dataset
         if attack != "none":
             attacked_dataset = poison_dataset(
-                dataset, attack,
+                clean_dataset if attack in {"mixed_noise", "mixed_all"} else dataset, attack,
                 poison_rate=poison_rate,
                 target_label=target_label,
                 source_label=source_label,
@@ -417,7 +417,7 @@ def run_extraction(job_id: str, request: dict) -> None:
                 seed=int(request.get("seed", 0)),
             )
             # Leila: retain main's dual-encoder workflow and aligned attacked rows.
-            if limit is not None and limit < len(attacked_dataset):
+            if attack not in {"mixed_noise", "mixed_all"} and limit is not None and limit < len(attacked_dataset):
                 attacked_dataset = attacked_dataset.take(limit)
         total = len(clean_dataset)
         sample_ids = np.asarray([f"{name}-{split}:{i}" for i in range(total)])
@@ -439,11 +439,13 @@ def run_extraction(job_id: str, request: dict) -> None:
             # Leila: poison identities stay separate from the image connector used by scanning.
             np.savez_compressed(artifacts / f'{stem}-evaluation.npz',sample_ids=sample_ids,
                 is_poisoned=np.zeros(total,dtype=bool) if metadata is None else metadata.is_poisoned[:total],
-                original_labels=labels if metadata is None else metadata.original_labels[:total])
+                original_labels=labels if metadata is None else metadata.original_labels[:total],
+                poison_type=np.full(total,"clean") if metadata is None else metadata.poison_type[:total])
             result = dict(dataset='mnist',samples=total,pixels_only=True,encoder=None,
                 image_file=str(image_path),feature_file=str(image_path),
                 poisoned=0 if metadata is None else int(metadata.is_poisoned[:total].sum()),
-                visual_features=None,labels=[])
+                visual_features=None,labels=[],
+                attack_counts={} if metadata is None else {str(k):int(np.sum(metadata.poison_type==k)) for k in np.unique(metadata.poison_type) if k != "clean"})
             update_job(job_id,status='complete',progress=100,message='MNIST pixels ready',result=result)
             return
         encoders = ["resnet18", "dinov2"] if name == "cifar10" else [encoder]
@@ -516,6 +518,8 @@ def run_extraction(job_id: str, request: dict) -> None:
         # Leila: copy the primary result so the JSON response has no circular reference.
         primary = dict(results[0])
         primary["representations"] = results
+        # Leila: report actual disjoint attack counts, not per-group percentages guessed from rounding.
+        primary["attack_counts"] = {} if metadata is None else {str(k):int(np.sum(metadata.poison_type==k)) for k in np.unique(metadata.poison_type) if k != "clean"}
         # Keep the blended detector in the same pipeline job as extraction so
         # the results page can present one complete run.
         if attack == "blended_injection" and name == "cifar10":

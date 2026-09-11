@@ -126,19 +126,24 @@
       // Leila: distinguish image patch ASR from IMDB phrase ASR.
       // Leila: label the evaluated image trigger accurately.
       const blended = Object.values(data.runs).some(run => run.backdoor_trigger?.type === 'blended_injection');
-      const imagePatch = data.dataset === 'cifar10';
-      $('backdoor-title').textContent = blended ? 'Backdoor test · CIFAR blended noise' : imagePatch ? 'Backdoor test · CIFAR patch' : 'Backdoor test · IMDB phrase';
-      $('backdoor-description').textContent = blended ? 'How often non-target official test images are predicted as the attack target, without and with the verified blended-noise trigger.' : imagePatch ? 'How often non-target official test images are predicted as the attack target, without and with the verified patch.' : 'How often negative official test reviews are predicted Positive, without and with the trigger phrase.';
+      const imagePatch = ['cifar10','mnist'].includes(data.dataset);
+      const mixed = Object.values(data.runs).some(run => run.backdoor_trigger?.type === 'mixed');
+      const datasetName = data.dataset === 'mnist' ? 'MNIST' : 'CIFAR-10';
+      $('backdoor-title').textContent = mixed ? `Backdoor test · ${datasetName} mixed triggers` : blended ? `Backdoor test · ${datasetName} blended noise` : imagePatch ? `Backdoor test · ${datasetName} patch` : 'Backdoor test · IMDB phrase';
+      $('backdoor-description').textContent = mixed ? 'Each trigger is tested separately. The main ASR table and chart show their unweighted mean; label flips are excluded. Details below show individual-seed results.' : blended ? 'How often non-target official test images are predicted as the attack target, without and with the verified blended-noise trigger.' : imagePatch ? 'How often non-target official test images are predicted as the attack target, without and with the verified patch.' : 'How often negative official test reviews are predicted Positive, without and with the trigger phrase.';
       $('backdoor-rows').replaceChildren();
       const arms=[['clean_reference','Clean reference'],['before_cleaning','Before cleaning'],['after_cleaning','After cleaning']];
       $('backdoor-comparison').hidden=!arms.some(([key])=>data.runs[key]?.backdoor_metrics);
       for (const [key,title] of arms) {
         const m=data.runs[key]?.backdoor_metrics;if (!m) continue;
-        const row=document.createElement('tr');
-        for (const value of [title,percent(m.untriggered_target_rate),percent(m.asr_non_target)]) {
-          const cell=document.createElement('td');cell.textContent=value;row.appendChild(cell);
+        const entries = mixed ? Object.entries(data.runs[key].trigger_metrics || {}) : [['',m]];
+        for (const [kind,metric] of entries) {
+          const row=document.createElement('tr');
+          for (const value of [kind ? `${title} · ${kind === 'image_patch' ? 'Patch' : 'Blended noise'}` : title,percent(metric.untriggered_target_rate),percent(metric.asr_non_target)]) {
+            const cell=document.createElement('td');cell.textContent=value;row.appendChild(cell);
+          }
+          $('backdoor-rows').appendChild(row);
         }
-        $('backdoor-rows').appendChild(row);
       }
     }
     if ($('learning-curve-content')) renderLearningCurves(data);

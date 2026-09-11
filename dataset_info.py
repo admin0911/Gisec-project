@@ -8,9 +8,9 @@ def describe_dataset(source, samples=None):
     if not header:
         return {'description': 'Dataset information unavailable for this saved input.'}
     dataset, split, size = header.groups()
-    attack = re.search(r'-(targeted_label_flip|label_flip|blended_injection|backdoor|none)-', name)
+    attack = re.search(r'-(targeted_label_flip|label_flip|blended_injection|mixed_noise|mixed_all|backdoor|none)-', name)
     kind = attack[1] if attack else 'unknown'
-    titles = {'none':'Clean data', 'label_flip':'Next-class label flip',
+    titles = {'mixed_noise':'Mixed: label flip + noise', 'mixed_all':'Mixed: label flip + patch + noise', 'none':'Clean data', 'label_flip':'Next-class label flip',
               'targeted_label_flip':'Targeted label flip', 'blended_injection':'Blended noise injection',
               'backdoor':'Backdoor phrase' if dataset=='imdb' else 'Backdoor patch'}
     parts = [{'cifar10':'CIFAR-10','mnist':'MNIST','imdb':'IMDB'}[dataset], titles.get(kind,'Attack unspecified')]
@@ -28,10 +28,10 @@ def describe_dataset(source, samples=None):
     target=re.search(r'-t(\d+)-',name); source_label=re.search(r'-s(\d+)-',name)
     if kind=='targeted_label_flip' and target and source_label:
         parts.append(f'Label {source_label[1]} → {target[1]}')
-    elif kind in ('backdoor','blended_injection') and target:
+    elif kind in ('backdoor','blended_injection','mixed_noise','mixed_all') and target:
         parts.append(f'Target label {target[1]}')
     alpha=re.search(r'-a([\d.]+)-',name)
-    if kind=='blended_injection' and alpha: parts.append(f'Blend strength {alpha[1]}')
+    if kind in ('blended_injection','mixed_noise','mixed_all') and alpha: parts.append(f'Blend strength {alpha[1]}')
     seed=re.search(r'-seed(\d+)',name)
     if seed: parts.append(f'Attack seed {seed[1]}')
     return {'description':' · '.join(parts), 'dataset':dataset, 'attack':kind,

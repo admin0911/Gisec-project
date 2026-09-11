@@ -1,6 +1,8 @@
 # Post-scan routing and reversible quarantine
 
-## Current policy: review disabled
+The examples below describe standalone policies and historical experiments. For the active web workflow, see [Training](../../TRAINING.md).
+
+## Standalone policy API (review disabled by default)
 
 ```python
 from cleaning import decide_label_flip_actions, partition_dataset, save_decisions
@@ -18,7 +20,7 @@ the keep view. Original pixels and supplied labels remain unchanged. These
 decisions address label flipping only; they do not override backdoor evidence.
 The function neither trains a model nor changes the frontend automatically.
 
-Pass `human_review_enabled=True` later to hold uncertain samples for human review.
+Pass `human_review_enabled=True` to hold uncertain samples for human review.
 This option never returns unresolved samples to training automatically.
 
 ## Earlier sequential experiment (retained for reproducibility)
@@ -64,7 +66,7 @@ save_decisions(decisions, 'artifacts/cleaning', source_description='your dataset
 current labels. IDs must cover exactly the same dataset; order can differ.
 Saved JSON contains reasons, vote counts, policy/threshold settings and IDs;
 separate ID lists let downstream code recreate each view from the source.
-The original dataset must be retained. Review resolutions are a later UI step.
+The original dataset must be retained. The web app supports saved review choices; see [Training](../../TRAINING.md) for its current selection policy.
 
 This module routes existing results. It does not call DINOv2 or alter the web
 app. A second-stage service must provide representative reference features for

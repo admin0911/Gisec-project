@@ -1,4 +1,4 @@
-"""Leila: evaluate saved CIFAR checkpoints without retraining; save a new result job."""
+"""Leila: evaluate saved image checkpoints without retraining; save a new result job."""
 import argparse
 from copy import deepcopy
 import json
@@ -18,8 +18,9 @@ def main():
     parser.add_argument('comparison', type=Path)
     args = parser.parse_args()
     report = json.loads(args.comparison.read_text(encoding='utf-8'))
-    if report.get('status') != 'complete' or report.get('dataset') != 'cifar10':
-        raise ValueError('Choose a completed CIFAR comparison.')
+    if report.get('status') != 'complete' or report.get('dataset') not in ('cifar10', 'mnist'):
+        raise ValueError('Choose a completed image comparison.')
+    dataset = report['dataset']
     manifest = load_preparation(report['version'])
     source = Path(manifest['source_images'])
     if file_hash(source) != manifest['source_sha256']:
@@ -27,17 +28,17 @@ def main():
     images = ImageInputBundle.load(source)
     if images.sample_ids.tolist() != manifest['sample_ids']:
         raise ValueError('Prepared source IDs changed.')
-    clean = load_image_dataset('cifar10', root=str(ARTIFACTS.parent/'data'), train=True, download=False)
+    clean = load_image_dataset(dataset, root=str(ARTIFACTS.parent/'data'), train=True, download=False)
     indices = []
     for sid in images.sample_ids:
-        if not str(sid).startswith('cifar10-train:'):
-            raise ValueError('Expected official CIFAR training IDs.')
+        if not str(sid).startswith(f'{dataset}-train:'):
+            raise ValueError('Expected official image training IDs.')
         indices.append(int(str(sid).split(':')[1]))
     spec = patch_specification(manifest, images, Subset(clean, indices))
     if spec is None:
-        raise ValueError('This comparison is not a supported CIFAR image-trigger attack.')
-    data = load_image_dataset('cifar10', root=str(ARTIFACTS.parent/'data'), train=False, download=False)
-    test = training_input(data, [f'cifar10-test:{i}' for i in range(len(data))], dataset_version='cifar10-official-test', split='test')
+        raise ValueError('This comparison is not a supported image image-trigger attack.')
+    data = load_image_dataset(dataset, root=str(ARTIFACTS.parent/'data'), train=False, download=False)
+    test = training_input(data, [f'{dataset}-test:{i}' for i in range(len(data))], dataset_version=f'{dataset}-official-test', split='test')
     job = uuid.uuid4().hex
     out = ARTIFACTS/'web_training'/job
     out.mkdir()
@@ -51,7 +52,7 @@ def main():
             run['artifacts']['report'] = str(folder/'report.json')
             add_patch_metrics(run, test, spec)
             print(run['backdoor_metrics'], flush=True)
-        item['limitation'] = 'Saved final checkpoints evaluated without retraining. CIFAR image-trigger ASR uses non-target official test images with the verified demo trigger.'
+        item['limitation'] = 'Saved final checkpoints evaluated without retraining. image image-trigger ASR uses non-target official test images with the verified demo trigger.'
         item['result_file'] = str(out/f'seed-{item["runs"]["clean_reference"]["settings"]["seed"]}'/'comparison.json')
         Path(item['result_file']).write_text(json.dumps(item, allow_nan=False), encoding='utf-8')
     result = deepcopy(reports[0])
@@ -59,7 +60,7 @@ def main():
         result['benchmark'] = dict(report['benchmark'], reports=reports, summary=summarize(reports))
     result.update(result_file=str(out/'comparison.json'), asr_source_comparison=str(args.comparison.resolve()))
     (out/'comparison.json').write_text(json.dumps(result, allow_nan=False), encoding='utf-8')
-    (out/'job.json').write_text(json.dumps(dict(job_id=job,version=result['version'],status='complete',progress=100,message='Saved models evaluated with CIFAR image-trigger ASR',result=result),allow_nan=False),encoding='utf-8')
+    (out/'job.json').write_text(json.dumps(dict(job_id=job,version=result['version'],status='complete',progress=100,message='Saved models evaluated with image image-trigger ASR',result=result),allow_nan=False),encoding='utf-8')
     print('ASR_JOB', job, flush=True)
 
 
