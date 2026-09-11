@@ -22,6 +22,19 @@ Add `--download` once if the official test split is not already under `data/`.
 Use `--device cuda` only when the installed PyTorch build can access an NVIDIA
 GPU. The output is saved under `artifacts/backdoor-defence/<timestamp>/`.
 
+### Complete MNIST dataset
+
+The dedicated command downloads or reuses the official 60,000-image training
+split, injects the controlled attack, scans all rows using pixels only, trains
+the three comparison models, and evaluates all 10,000 official test images:
+
+```powershell
+C:\Users\hp\.venv\Scripts\python.exe -m experiments.defend_mnist --poison-rate 0.05 --epochs 3 --threads 4 --open
+```
+
+Add `--download` if MNIST has not already been downloaded. Results are written
+under `artifacts/mnist-backdoor-defence/<timestamp>/`.
+
 ## Decision policy
 
 The detector receives only pixels, features, current labels, and stable sample
@@ -80,11 +93,36 @@ triggered target rate. The defended model's remaining 5.78% target rate is below
 that reference rate; its backdoor ASR lift was -0.50 percentage points. These
 numbers demonstrate mitigation for this controlled run, not universal immunity.
 
+## Complete MNIST result
+
+The full-data command was run with all 60,000 training images, all 10,000 test
+images, a 5% white 3x3 bottom-right patch, target label 0, attack seed 0,
+training seed 42, three epochs, and batch size 256.
+
+| Measure | Result |
+|---|---:|
+| Poisoned rows quarantined | 3,000 / 3,000 |
+| Clean rows quarantined | 0 / 57,000 |
+| Clean-data retention | 100% |
+| Before-defence clean accuracy | 97.80% |
+| After-defence clean accuracy | 97.92% |
+| Clean-reference accuracy | 97.98% |
+| Before-defence triggered ASR | 99.73% |
+| After-defence triggered ASR | 0.13% |
+| Before-defence conditional ASR | 99.73% |
+| After-defence conditional ASR | 0.00% |
+
+The raw ASR reduction was 99.60 percentage points, or 99.87% relative. The
+defended model had no clean-correct eligible image flip to target class 0 after
+the trigger. Its small remaining raw target rate was below its own untriggered
+target rate, so the measured backdoor lift was negative.
+
 ## Limitations
 
-This experiment uses 1,000 training images, one model architecture, one training
-seed, and an exact square evaluation trigger. A stronger final study should use
-the full training split, multiple seeds, and independent trigger configurations.
-Adaptive, blended, moving, semantic and text triggers require their own detectors,
-cleaning policies and ASR definitions. A zero finding never proves that a dataset
-is clean.
+The CIFAR-10 smoke experiment uses 1,000 training images. The MNIST experiment
+uses the complete official train and test splits, but still uses one model
+architecture, one attack seed, one training seed, and an exact square trigger.
+A stronger final study should use multiple seeds and independent trigger
+configurations. Adaptive, blended, moving, semantic and text triggers require
+their own detectors, cleaning policies and ASR definitions. A zero finding never
+proves that a dataset is clean.

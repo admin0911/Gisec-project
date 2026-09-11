@@ -37,14 +37,19 @@ def decide_backdoor_actions(
 
     active = list(settings.get("active_detectors", []))
     comparison_only = list(settings.get("comparison_only", []))
-    quarantine = tuple(quarantine_detectors)
-    review = tuple(review_detectors)
+    configured_quarantine = tuple(quarantine_detectors)
+    configured_review = tuple(review_detectors)
+    if set(configured_quarantine) & set(configured_review):
+        raise ValueError("A detector cannot have two defence actions")
+    unknown = set(active) - set(configured_quarantine) - set(configured_review)
+    quarantine = tuple(name for name in configured_quarantine if name in active)
+    review = tuple(name for name in configured_review if name in active)
     if (
         not active
         or len(active) != len(set(active))
         or set(active) & set(comparison_only)
+        or unknown
         or set(active) != set(quarantine) | set(review)
-        or set(quarantine) & set(review)
         or set(active) - set(detectors)
     ):
         raise ValueError("Every active detector must have one explicit defence action")

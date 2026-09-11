@@ -11,6 +11,8 @@ results remain visible for comparison. The feature-only methods remain experimen
 To quarantine patch findings and compare fresh clean, poisoned and defended
 models with clean accuracy and triggered ASR, see the
 [backdoor defence workflow](docs/detectors/backdoor/DEFENCE.md).
+The complete MNIST benchmark runs with
+`python -m experiments.defend_mnist --poison-rate 0.05 --epochs 3 --open`.
 
 For label-flip detectors, the shared output connector, and saved-feature run
 commands, see the [detector code guide](docs/detectors/README.md).

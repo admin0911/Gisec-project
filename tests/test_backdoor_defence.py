@@ -9,6 +9,7 @@ from torch.utils.data import TensorDataset
 
 from cleaning.backdoor import decide_backdoor_actions
 from experiments.defend_backdoor import defence_effect, removal_metrics, validate_matched_bundles
+from experiments.defend_mnist import scan_pixels
 from poison_features import ImageInputBundle
 from training.backdoor_evaluation import (
     TriggeredDataset,
@@ -77,6 +78,28 @@ class BackdoorDefenceTests(unittest.TestCase):
         scan["settings"]["active_detectors"].append("new_detector")
         with self.assertRaisesRegex(ValueError, "explicit"):
             decide_backdoor_actions(scan)
+
+    def test_pixel_only_scan_does_not_require_absent_feature_detectors(self):
+        scan = self.scan()
+        scan["detectors"] = {"contrast_patch": scan["detectors"]["contrast_patch"]}
+        scan["settings"]["active_detectors"] = ["contrast_patch"]
+        scan["settings"]["comparison_only"] = []
+        scan["candidate_flags"] = scan["detectors"]["contrast_patch"]["flags"].copy()
+        decision = decide_backdoor_actions(scan)
+        self.assertEqual(decision["actions"].tolist(), ["keep", "quarantine", "keep", "keep"])
+        self.assertEqual(decision["settings"]["review_detectors"], [])
+
+    def test_pixel_only_mnist_scan_connects_to_defence_policy(self):
+        rng = np.random.default_rng(7)
+        images = rng.uniform(0, .5, (200, 1, 8, 8)).astype(np.float32)
+        labels = np.arange(200) % 10
+        images[:20, :, -3:, -3:] = 1
+        labels[:20] = 0
+        pixels = ImageInputBundle(images, labels, np.array([f"m:{i}" for i in range(200)]))
+        scan = scan_pixels(pixels)
+        decision = decide_backdoor_actions(scan)
+        self.assertTrue(decision["quarantine_flags"][:20].all())
+        self.assertFalse(decision["quarantine_flags"][20:].any())
 
     def test_trigger_is_positioned_and_source_is_unchanged(self):
         image = torch.zeros(3, 8, 9)
