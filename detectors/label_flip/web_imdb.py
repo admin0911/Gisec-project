@@ -27,6 +27,11 @@ def run(path,output,progress):
         raise ValueError('Expected finite 384-dimensional MiniLM features.')
     if len(inputs.y)<=20 or not np.isin(inputs.y,[0,1]).all() or len(np.unique(inputs.y))!=2 or np.bincount(inputs.y.astype(int)).min()<5:
         raise ValueError('Use at least 21 reviews and at least five reviews per sentiment label.')
+    from detectors.feature_pipeline import scan_feature_bundle
+    feature_backdoor = scan_feature_bundle(
+        bundle, tracks=("backdoor",), representation="raw",
+        progress=lambda message: progress(5.2, f"Stage 2 of 3 · Backdoor checks\n{message}"),
+    )["tracks"]["backdoor"]
     # Leila: require submitted text for backdoor builds; never reconstruct clean text for them.
     text_path=path.with_name(path.name.replace('-features.npz','-texts.jsonl'))
     if '-backdoor-' in path.name and not text_path.exists(): raise ValueError('Rebuild IMDB backdoor data to save review text.')
@@ -50,6 +55,7 @@ def run(path,output,progress):
     assessment=dict(sample_ids=inputs.sample_ids,assessment=states,flags=votes>0,vote_counts={'minilm':votes},
         summary={s:int(np.sum(states==s)) for s in ('not_flagged','uncertain','suspected_label_flip')})
     ui=dict(dataset='imdb',samples=len(votes),summary=assessment['summary'],detectors=rows,
+        backdoor_feature=feature_backdoor,
         examples=[dict(sample_id=str(inputs.sample_ids[i]),label=int(inputs.y[i]),assessment=str(states[i]),text_votes=int(votes[i])) for i in np.flatnonzero(votes)[:24]],
         profile=config['name'],limitation='Provisional IMDB thresholds, not calibrated. Two of three flags means suspected label error, not proof. General MiniLM similarity may reflect topic rather than sentiment. Text review and frozen-feature sentiment training are available.',
         result_file=str(output/'results.json'),human_review_enabled=True,training_enabled=True)
@@ -76,7 +82,9 @@ def run(path,output,progress):
                 ui['demo_evaluation']=dict(known_poisoned=int(truth.sum()),caught=tp,false_positives=fp,
                     precision=tp/(tp+fp) if tp+fp else None,recall=tp/(tp+fn) if tp+fn else None)
     if identity!=scan_identity((path,),config): raise ValueError('Features changed during scanning.')
-    full=dict(dataset='imdb',feature_files=[str(path)],assessment=assessment,scans={'minilm':{'detectors':results}},ui_result=ui,profile=config)
+    full=dict(dataset='imdb',feature_files=[str(path)],assessment=assessment,
+        backdoor_feature=feature_backdoor, scans={'minilm':{'detectors':results}},
+        ui_result=ui, profile=config)
     if phrase_result is not None: full['phrase_scan']=phrase_result
     (output/'results.json').write_text(json.dumps(to_jsonable(full),allow_nan=False),encoding='utf-8')
     save_cache_record(output,identity)
