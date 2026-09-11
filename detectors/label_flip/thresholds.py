@@ -22,5 +22,5 @@ def calibrated_profile(encoder):
             'confident_learning': {'folds': 5, 'seed': 2026, 'max_iter': 1000},
             'calibration_samples': 25000, 'split_seed': 20260910,
             'dependencies': {'numpy': '1.26.4', 'scikit-learn': '1.7.2', 'cleanlab': '2.7.1'},
-            'status': 'development_calibration_full50k_includes_calibration_rows',
+            'status': 'calibrated_on_25k_clean_split; metrics reported on disjoint 25k validation half',
             'inactive_detectors': ['knn'] if encoder == 'resnet18' else []}

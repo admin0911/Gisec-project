@@ -155,7 +155,7 @@
     }
     if (imdb) {
 
-      const e=data.demo_evaluation, pct=v=>v==null?'N/A':`${(v*100).toFixed(2)}%`;
+      const e=data.demo_evaluation, pct=v=>v==null?'N/A (no poison in this dataset)':`${(v*100).toFixed(2)}%`;
       get('imdb-evaluation').hidden=false;
       get('imdb-evaluation').textContent=e ? `Demo evaluation · 2 of 3 rule · Precision ${pct(e.precision)} · Recall ${pct(e.recall)} · ${number(e.caught)} of ${number(e.known_poisoned)} poisoned reviews caught · ${number(e.false_positives)} clean reviews flagged. Known identities are used only for evaluation.` : 'Demo evaluation unavailable: no known poison metadata.';
     }
