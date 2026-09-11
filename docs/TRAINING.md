@@ -65,4 +65,8 @@ reference run belongs to benchmark code, not to the real cleaning decision.
 Backdoor ASR evaluation and a full policy comparison are later steps; this module
 currently reports classification on the provided test dataset only.
 
+The controlled square-patch defence supplies those additional steps through
+`python -m experiments.defend_backdoor`; see
+[`detectors/backdoor/DEFENCE.md`](detectors/backdoor/DEFENCE.md).
+
 The frontend is not wired to this entry point yet. No automatic git push occurs.

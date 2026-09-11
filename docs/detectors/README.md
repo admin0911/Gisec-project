@@ -21,6 +21,8 @@ candidates even when feature detectors return no flags.
 The command's revised default and measured limitations are documented in
 [PATCH_FIX.md](backdoor/PATCH_FIX.md). The legacy detector remains available
 as a separately labelled comparison.
+The reversible quarantine, three-model retraining comparison, and clean/triggered
+test evaluation are documented in [DEFENCE.md](backdoor/DEFENCE.md).
 
 Start with [CONNECTOR.md](CONNECTOR.md) for integration, or
 [CONFIDENT_LEARNING.md](label_flip/CONFIDENT_LEARNING.md) for label-flip experiment setup.

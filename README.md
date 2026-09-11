@@ -8,6 +8,10 @@ Run saved image/feature pairs with
 The command now defaults to the contrast profile; the original bright-patch
 results remain visible for comparison. The feature-only methods remain experimental.
 
+To quarantine patch findings and compare fresh clean, poisoned and defended
+models with clean accuracy and triggered ASR, see the
+[backdoor defence workflow](docs/detectors/backdoor/DEFENCE.md).
+
 For label-flip detectors, the shared output connector, and saved-feature run
 commands, see the [detector code guide](docs/detectors/README.md).
 Feature matrices exported by another program can use the dataset-neutral
