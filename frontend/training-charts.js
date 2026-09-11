@@ -6,7 +6,7 @@ const TrainingCharts = (() => {
     const rows = arms.filter(([k]) => data.runs[k] && !(k === 'before_cleaning' && skipBefore));
     const backdoor = rows.some(([k]) => data.runs[k].backdoor_metrics != null);
     return {rows, panels:[{title:'Clean test accuracy',direction:'Higher is better',values:rows.map(([k])=>(data.benchmark?.summary[k]?.accuracy?.mean ?? data.runs[k].metrics?.accuracy))},
-      {title:backdoor?'Backdoor ASR':'Macro F1',direction:backdoor?'Lower is better':'Higher is better',values:rows.map(([k])=>backdoor?(data.benchmark?.summary[k]?.asr_non_target?.mean ?? data.runs[k].backdoor_metrics?.asr_non_target):(data.benchmark?.summary[k]?.macro_f1?.mean ?? macro(data.runs[k].metrics)?.f1))}]};
+      {title:backdoor?(Object.values(data.runs).some(r=>r.backdoor_trigger?.type==='mixed')?'Mean trigger ASR':'Backdoor ASR'):'Macro F1',direction:backdoor?'Lower is better':'Higher is better',values:rows.map(([k])=>backdoor?(data.benchmark?.summary[k]?.asr_non_target?.mean ?? data.runs[k].backdoor_metrics?.asr_non_target):(data.benchmark?.summary[k]?.macro_f1?.mean ?? macro(data.runs[k].metrics)?.f1))}]};
   }
   function filename(data, context={}) {
     const safe = value => String(value || 'unknown').toLowerCase().replace(/[^a-z0-9_-]+/g,'-');

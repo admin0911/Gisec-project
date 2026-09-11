@@ -54,12 +54,12 @@ accuracy and the untriggered target-prediction rate.
 | CIFAR-10 patch or single blended-noise attack | Supported using the verified trigger recipe |
 | IMDB phrase backdoor | Supported for the app's silver lantern prefix, target 1 |
 | Label flips | Not applicable |
-| MNIST and mixed image attacks | Not implemented; do not interpret N/A as zero |
+| MNIST patch/blended and mixed image attacks | Supported; mixed triggers evaluated separately, main ASR is their unweighted mean |
 
-For a compatible saved CIFAR comparison, ASR can be added without retraining:
+For a compatible saved CIFAR-10 or MNIST comparison, ASR can be added without retraining:
 
 ```powershell
-python -m experiments.add_cifar_asr artifacts/web_training/YOUR-JOB/comparison.json
+python -m experiments.add_image_asr artifacts/web_training/YOUR-JOB/comparison.json
 ```
 
 ## Saved results and reconnecting

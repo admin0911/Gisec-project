@@ -65,7 +65,15 @@ async function page({poisoned=3, removed=9, caught=2, available=true, statuses=[
   assert.equal(p.nodes['backdoor-title'].textContent,'Backdoor test · IMDB phrase');
   curves.result.dataset='cifar10';
   p=await page({statuses:[curves]});
-  assert.equal(p.nodes['backdoor-title'].textContent,'Backdoor test · CIFAR patch');
+  assert.equal(p.nodes['backdoor-title'].textContent,'Backdoor test · CIFAR-10 patch');
+  curves.result.dataset='mnist';
+  p=await page({statuses:[curves]});
+  assert.equal(p.nodes['backdoor-title'].textContent,'Backdoor test · MNIST patch');
+  curves.result.runs.after_cleaning.backdoor_trigger={type:'mixed'};
+  curves.result.runs.after_cleaning.trigger_metrics={image_patch:{untriggered_target_rate:.1,asr_non_target:.3},blended_injection:{untriggered_target_rate:.1,asr_non_target:.1}};
+  p=await page({statuses:[curves]});
+  assert.equal(p.nodes['backdoor-rows'].children.length,2);
+  assert(p.nodes['backdoor-description'].textContent.includes('unweighted mean'));
   const panel=p.nodes['learning-curve-content'].children.at(-1);
   assert(panel.children.some(c=>c.role==='img'));
   assert(panel.children.some(c=>c.textContent.includes('Validation: 100')));
