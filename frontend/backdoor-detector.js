@@ -28,7 +28,9 @@
     if (!featureFile || running) return;
     running = true; button.disabled = true; status.textContent = 'Running feature backdoor detectors…';
     try {
-      const response = await fetch('/api/backdoor-features/scan', {
+      // Use the unified scan route so feature findings and Leila's
+      // fail-safe detectors share review and training preparation.
+      const response = await fetch('/api/label-flip/scan', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({feature_file: featureFile})
       });

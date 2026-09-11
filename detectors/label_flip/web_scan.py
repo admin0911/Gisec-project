@@ -237,6 +237,7 @@ def run_scan(feature_file, output_dir, progress):
     ])
     feature_votes = feature_flags.sum(axis=0).astype(np.int64)
     backdoor_feature = dict(
+        sample_ids=inputs["resnet18"].sample_ids,
         detectors={f"{encoder}_{name}": result
                    for encoder, track in feature_backdoor.items()
                    for name, result in track["detectors"].items()},

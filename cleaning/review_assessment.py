@@ -9,6 +9,15 @@ def review_assessment(scan):
     patch = scan.get('phrase_scan') if scan.get('dataset') == 'imdb' else scan.get('patch_scan')
     ids = np.asarray(assessment['sample_ids'])
     states = None
+    # Feature backdoor candidates are additional review evidence, not label votes.
+    feature = scan.get('backdoor_feature')
+    if feature is not None:
+        feature_flags = np.asarray(feature.get('candidate_flags', []), dtype=bool)
+        if feature_flags.shape != ids.shape or not np.array_equal(ids, feature.get('sample_ids', ids)):
+            raise ValueError('Feature backdoor flags must match the scan sample IDs')
+        if states is None:
+            states = np.asarray(assessment['assessment'], dtype='<U24').copy()
+        states[feature_flags & (states == 'not_flagged')] = 'uncertain'
     # Leila: both image datasets use noise flags without adding label votes.
     blended = scan.get('blended_scan')
     for detector in (patch, blended):
