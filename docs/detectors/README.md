@@ -18,6 +18,9 @@ backdoor feature methods, command-line runs, thresholds, and limitations.
 
 Start with [CONNECTOR.md](CONNECTOR.md) for integration, or
 [CONFIDENT_LEARNING.md](label_flip/CONFIDENT_LEARNING.md) for label-flip experiment setup.
+For a dataset-neutral NPZ or in-memory feature matrix, use
+[FEATURE_BUNDLE_INPUT.md](FEATURE_BUNDLE_INPUT.md) and
+`python -m experiments.scan_feature_bundle`.
 
 For the optional DINOv2 extractor and paired ResNet18 comparison, see
 [FEATURE_COMPARISON.md](label_flip/FEATURE_COMPARISON.md).
