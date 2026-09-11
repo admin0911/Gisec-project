@@ -8,6 +8,7 @@
 - `label_flip/pipeline.py`: runs all three and combines review votes.
 - `output_connector.py`: shared result dictionary and JSON conversion.
 - `backdoor/repeated_patch.py`: repeated bright pixel-patch heuristic, integrated into image web scans.
+- `backdoor/contrast_patch.py`: contrast-aware exact patch detector used by the combined saved-image scan and defence benchmarks.
 - `backdoor/spectral_signature.py`: experimental within-class spectral feature outliers.
 - `backdoor/activation_clustering.py`: experimental minority feature-cluster analysis.
 - `backdoor/feature_pipeline.py`: both feature methods with separate results and review candidates.
@@ -15,12 +16,22 @@
 
 See [FEATURE_DETECTORS.md](backdoor/FEATURE_DETECTORS.md) for the experimental
 backdoor feature methods, command-line runs, thresholds, and limitations.
+To scan saved image/feature pairs together and open a visual HTML report, use
+[RUN_IMAGE_SCAN.md](backdoor/RUN_IMAGE_SCAN.md). Pixel flags remain review
+candidates even when feature detectors return no flags.
+The command's revised default and measured limitations are documented in
+[PATCH_FIX.md](backdoor/PATCH_FIX.md). The legacy detector remains available
+as a separately labelled comparison.
+The reversible quarantine, three-model retraining comparison, and clean/triggered
+test evaluation are documented in [DEFENCE.md](backdoor/DEFENCE.md).
 
 Start with [CONNECTOR.md](CONNECTOR.md) for integration, or
 [CONFIDENT_LEARNING.md](label_flip/CONFIDENT_LEARNING.md) for label-flip experiment setup.
 For a dataset-neutral NPZ or in-memory feature matrix, use
 [FEATURE_BUNDLE_INPUT.md](FEATURE_BUNDLE_INPUT.md) and
-`python -m experiments.scan_feature_bundle`.
+`python -m experiments.scan_feature_bundle`. Feature-only input cannot run
+the two pixel patch detectors; use a matching `*-images.npz` bundle with the
+combined image command when patch detection is required.
 
 For the optional DINOv2 extractor and paired ResNet18 comparison, see
 [FEATURE_COMPARISON.md](label_flip/FEATURE_COMPARISON.md).
