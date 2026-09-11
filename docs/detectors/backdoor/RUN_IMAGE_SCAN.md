@@ -10,10 +10,15 @@ The earlier `scan_backdoor_features` command scans embeddings only. On the
 submitted 1,000-row CIFAR-10 patch experiment it missed all 54 poisoned rows
 with both ResNet-18 and DINOv2. That failed result remains valid.
 
-The new command adds the existing pixel detector, using its unchanged
-`cifar-bright-patch-v1` profile. A pixel flag remains a review candidate even
-when both feature methods return zero flags. This fixes incomplete routing;
-it does not repair the feature methods' sensitivity or remove false positives.
+The combined command runs the contrast-aware detector as the active pixel
+detector and keeps the legacy repeated-patch result as a separately labelled
+comparison. A pixel flag remains a review candidate even when both feature
+methods return zero flags. This fixes incomplete routing; it does not repair
+the feature methods' sensitivity or establish universal patch detection.
+
+A `*-features.npz` file alone can run only Spectral Signatures and Activation
+Clustering. Patch detection requires the aligned `*-images.npz` bundle because
+the detector must inspect the original pixels and their local boundaries.
 
 ## Windows / VS Code
 

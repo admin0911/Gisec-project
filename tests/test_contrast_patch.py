@@ -5,13 +5,17 @@ from unittest.mock import patch
 
 import numpy as np
 from poison_features import ImageInputBundle
-from detectors.backdoor.contrast_patch import ContrastPatchDetector, boundary_contrast
+from detectors.backdoor import ContrastPatchDetector
+from detectors.backdoor.contrast_patch import boundary_contrast
 from detectors.backdoor.image_pipeline import scan_backdoor_images
 from detectors.output_connector import to_jsonable
 from experiments.validate_patch_fix import compare_case
 
 
 class ContrastPatchTests(unittest.TestCase):
+    def test_public_package_export(self):
+        self.assertEqual(ContrastPatchDetector.__name__, "ContrastPatchDetector")
+
     def clean(self, n=1000):
         images = np.random.default_rng(8).uniform(.2, .8, (n, 3, 10, 10)).astype(np.float32)
         return ImageInputBundle(images, np.arange(n) % 10, np.array([f"sample:{i}" for i in range(n)]))
