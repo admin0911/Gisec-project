@@ -42,7 +42,7 @@ function updateWorkflowVisibility() {
   const labelFlip = ['label_flip', 'targeted_label_flip'].includes(attack);
   const blended = attack === 'blended_injection' && cifar;
   $('label-flip-controls').hidden = !labelFlip;
-  $('backdoor-controls').hidden = attack !== 'backdoor';
+  if ($('backdoor-controls')) $('backdoor-controls').hidden = attack !== 'backdoor';
   $('blended-controls').hidden = !blended;
   if (!blended) $('blended-result').hidden = true;
   if (!labelFlip) {
